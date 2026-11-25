@@ -2,7 +2,7 @@
 
 Run all GitOps from one hub cluster and let every workload cluster (spoke) pull its work through a small agent. The hub holds the Argo CD UI and API. Each spoke runs its own application controller and its own agent. Spokes open an outbound connection to the hub, so the hub never needs credentials for a spoke's API server.
 
-Written for Red Hat OpenShift GitOps 1.22 (source: *Argo CD Agent installation*, last updated 2026-10-01, kept in the repo root as `rh_gitops_1.22_argocd_agent.md`). Not executed on a cluster yet.
+Written for Red Hat OpenShift GitOps 1.22 (source: *Argo CD Agent installation*, last updated 2026-10-01, kept in this folder as `rh_gitops_1.22_argocd_agent.md`). Not executed on a cluster yet.
 
 ## How it fits together
 
