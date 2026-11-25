@@ -1,0 +1,77 @@
+# application-alerting-rule.yaml
+# Purpose: Three go-live alerts for the application namespaces.
+#
+# Evaluated by platform Prometheus. Pod status, container memory, and
+# router metrics are platform series. A PrometheusRule in the application
+# namespace cannot see them.
+#
+# Namespace selector: app-test on the test cluster.
+# Before you apply this file on production, change every namespace regex
+# from app-test to app-test|<production-namespace>.
+# The placeholder until that name is known is app-prod, for example:
+#   namespace=~"app-test|app-prod"
+#   exported_namespace=~"app-test|app-prod"
+# One rule, same file, two clusters. Do not write a second rule design.
+#
+# Router series: match exported_namespace (the route's project).
+# The namespace label on haproxy_server_http_responses_total is often
+# openshift-ingress. Do not put openshift-ingress in this regex.
+#
+# 5xx threshold 0.1 is about 30 responses in five minutes. Change that
+# number if the application traffic is much quieter or much louder.
+# Alertmanager routing stays on the cluster default. Do not add a receiver here.
+apiVersion: monitoring.openshift.io/v1
+kind: AlertingRule
+metadata:
+  name: application-go-live-alerts
+  namespace: openshift-monitoring
+spec:
+  groups:
+    - name: application-go-live.rules
+      rules:
+        - alert: ApplicationPodNotReady
+          expr: |
+            (
+              kube_pod_status_ready{condition="false", namespace=~"app-test"} == 1
+            )
+            unless on (namespace, pod)
+            (
+              kube_pod_status_phase{phase="Succeeded", namespace=~"app-test"} == 1
+            )
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} has been not Ready for 15 minutes"
+        - alert: ApplicationContainerMemoryHigh
+          expr: |
+            (
+              sum by (namespace, pod, container) (
+                container_memory_working_set_bytes{namespace=~"app-test", container!="", container!="POD"}
+              )
+              /
+              sum by (namespace, pod, container) (
+                kube_pod_container_resource_limits{namespace=~"app-test", resource="memory"}
+              )
+            ) > 0.9
+            and on (namespace, pod, container)
+            (
+              sum by (namespace, pod, container) (
+                kube_pod_container_resource_limits{namespace=~"app-test", resource="memory"}
+              ) > 0
+            )
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Container {{ $labels.namespace }}/{{ $labels.pod }}/{{ $labels.container }} memory is above 90% of its limit"
+        - alert: ApplicationRouterHTTP5xxSpike
+          expr: |
+            sum by (exported_namespace, route) (
+              rate(haproxy_server_http_responses_total{code="5xx", exported_namespace=~"app-test"}[5m])
+            ) > 0.1
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Route {{ $labels.exported_namespace }}/{{ $labels.route }} returned more than 0.1 HTTP 5xx responses per second over 5 minutes"

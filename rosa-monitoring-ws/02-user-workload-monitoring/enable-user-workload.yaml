@@ -1,0 +1,19 @@
+# enable-user-workload.yaml
+# Purpose: The single key this workshop adds to cluster-monitoring-config.
+#
+# Do not apply this file when cluster-monitoring-config already exists.
+# oc apply would replace data.config.yaml and drop retention, storage,
+# and any other keys already set on the cluster. On ROSA those keys are
+# part of the managed monitoring configuration.
+#
+# Apply this file only when the ConfigMap is absent. If it exists, edit
+# the live object and add enableUserWorkload: true next to the existing keys.
+# See 02-user-workload-monitoring/README.md.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-monitoring-config
+  namespace: openshift-monitoring
+data:
+  config.yaml: |
+    enableUserWorkload: true
