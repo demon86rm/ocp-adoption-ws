@@ -5,6 +5,7 @@ Turn the hub's Argo CD into the control plane: enable the Principal, create one 
 **Prerequisites**
 
 - [01-prerequisites](../01-prerequisites/README.md) finished in this shell.
+- cert-manager Operator for Red Hat OpenShift installed on the hub.
 
 Set the agent name used for the first spoke if you have not (`AGENT_NAME`). The hub namespace for an agent must have exactly the agent's name.
 
@@ -95,48 +96,114 @@ Expected output: namespace `Active`; the agent name appears in the list.
 
 ## 3. Create the certificates and the JWT key
 
-**What:** A CA, a server certificate for the Principal's gRPC endpoint, a server certificate for the resource proxy, and a signing key for agent tokens.
+**What:** A CA secret, an `Issuer`, a server certificate for the Principal's gRPC endpoint, a server certificate for the resource proxy, and a signing key for agent tokens. cert-manager issues and renews the certificates.
 
-**Why:** All Principal and agent traffic is mutually authenticated TLS, and agents receive short-lived JWTs signed with the key.
+**Why:** All Principal and agent traffic is mutually authenticated TLS, and agents receive short-lived JWTs signed with the key. Certificates expire, so they must renew without hand work.
 
-> The CLI-generated PKI below is for development and testing only. For production, issue the CA and the two server certificates from your organisation's PKI and create the same secrets from them. Keep the secret names the same.
+The `argocd-agentctl pki` commands are for development and testing only (upstream docs). This guide does not use them.
+
+### 3a. The CA secret
+
+The Principal signs and verifies with one CA. Create it as a TLS secret named `argocd-agent-ca` in the Principal namespace on the hub. Its private key stays on the hub and is never copied to a spoke.
+
+**Production:** use a CA certificate and key issued by your organisation's PKI (a dedicated intermediate is best, so you can revoke it alone).
 
 ```bash
-argocd-agentctl pki init \
-  --principal-namespace "${PRINCIPAL_NS}" \
-  --principal-context "${PRINCIPAL_CONTEXT}"
+oc create secret tls argocd-agent-ca \
+  --cert=<ca.crt> --key=<ca.key> \
+  -n "${PRINCIPAL_NS}" --context "${PRINCIPAL_CONTEXT}"
+```
 
-argocd-agentctl pki issue principal \
-  --principal-namespace "${PRINCIPAL_NS}" \
-  --principal-context "${PRINCIPAL_CONTEXT}" \
-  --dns "${PRINCIPAL_DNS}"
+**Lab only, no CA available:** make a throwaway one, load it, and delete the key file.
 
-argocd-agentctl pki issue resource-proxy \
-  --principal-namespace "${PRINCIPAL_NS}" \
-  --principal-context "${PRINCIPAL_CONTEXT}" \
-  --dns "openshift-gitops-agent-principal-resource-proxy"
+```bash
+openssl genrsa -out ca.key 4096
+openssl req -x509 -new -key ca.key -sha256 -days 365 \
+  -subj "/CN=argocd-agent-ca" \
+  -addext "basicConstraints=critical,CA:TRUE" \
+  -addext "keyUsage=critical,keyCertSign,cRLSign" \
+  -out ca.crt
+oc create secret tls argocd-agent-ca --cert=ca.crt --key=ca.key \
+  -n "${PRINCIPAL_NS}" --context "${PRINCIPAL_CONTEXT}"
+shred -u ca.key 2>/dev/null || rm -P ca.key
+```
 
+### 3b. Issuer and certificates
+
+The shell expands `${PRINCIPAL_DNS}` and `${PRINCIPAL_NS}` in this heredoc, so run it in the shell where they are set. `duration` and `renewBefore` are suggested values, not values from the Red Hat page. Every certificate must stay inside the CA's own validity.
+
+```bash
+oc apply --context "${PRINCIPAL_CONTEXT}" -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: argocd-agent-ca
+  namespace: ${PRINCIPAL_NS}
+spec:
+  ca:
+    secretName: argocd-agent-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: argocd-agent-principal-tls
+  namespace: ${PRINCIPAL_NS}
+spec:
+  secretName: argocd-agent-principal-tls
+  commonName: principal
+  dnsNames:
+    - ${PRINCIPAL_DNS}
+    - openshift-gitops-agent-principal.${PRINCIPAL_NS}.svc.cluster.local
+  usages: [server auth, digital signature, key encipherment]
+  duration: 4320h
+  renewBefore: 1440h
+  privateKey: {algorithm: RSA, size: 4096}
+  issuerRef: {name: argocd-agent-ca, kind: Issuer}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: argocd-agent-resource-proxy-tls
+  namespace: ${PRINCIPAL_NS}
+spec:
+  secretName: argocd-agent-resource-proxy-tls
+  commonName: resource-proxy
+  dnsNames:
+    - openshift-gitops-agent-principal-resource-proxy
+    - openshift-gitops-agent-principal-resource-proxy.${PRINCIPAL_NS}.svc.cluster.local
+  usages: [server auth, client auth, digital signature, key encipherment]
+  duration: 4320h
+  renewBefore: 1440h
+  privateKey: {algorithm: RSA, size: 4096}
+  issuerRef: {name: argocd-agent-ca, kind: Issuer}
+EOF
+```
+
+- The first DNS name of the Principal certificate must equal the route host (or load-balancer host) that agents dial. A mismatch shows up as a certificate error in the agent log.
+- The resource-proxy name is `<ArgoCD name>-agent-principal-resource-proxy`. Argo CD reaches it by that service name inside the hub.
+- If clients reach the Principal by IP, add `ipAddresses`.
+
+### 3c. The JWT signing key
+
+cert-manager does not issue this key. It is an RSA key, not a certificate, and rotates separately.
+
+```bash
 argocd-agentctl jwt create-key \
   --principal-namespace "${PRINCIPAL_NS}" \
   --principal-context "${PRINCIPAL_CONTEXT}"
 ```
 
-What each does:
-
-- `pki init` creates a self-signed CA and the `argocd-agent-ca` secret.
-- `pki issue principal` creates `argocd-agent-principal-tls`. `--dns` must equal the route host (or load-balancer host) that agents dial. A mismatch shows up later as a certificate error in the agent log. Add `--ip` for a comma-separated list of IPs if clients use IPs.
-- `pki issue resource-proxy` creates `argocd-agent-resource-proxy-tls`. The DNS name is the in-cluster service name, `<ArgoCD name>-agent-principal-resource-proxy`.
-- `jwt create-key` creates a 4096-bit RSA key in `argocd-agent-jwt`.
-- Each command takes `--upsert` (`-u`) to replace an existing object.
+This creates a 4096-bit PKCS#8 key in the `argocd-agent-jwt` secret. `--upsert` (`-u`) replaces it. For production, create that secret from a key generated and stored under your own key management and keep the same secret name.
 
 ### Verify
 
 ```bash
+oc get certificate -n "${PRINCIPAL_NS}" --context "${PRINCIPAL_CONTEXT}"
 oc get secrets -n "${PRINCIPAL_NS}" --context "${PRINCIPAL_CONTEXT}" | grep agent
 oc get pod -n "${PRINCIPAL_NS}" --context "${PRINCIPAL_CONTEXT}"
 ```
 
-Expected output: four secrets (`argocd-agent-ca`, `argocd-agent-principal-tls`, `argocd-agent-resource-proxy-tls`, `argocd-agent-jwt`). The Principal pod becomes `1/1 Running`. If it stays `0/1`, restart it: `oc rollout restart deployment/openshift-gitops-agent-principal -n "${PRINCIPAL_NS}" --context "${PRINCIPAL_CONTEXT}"`.
+Expected output: both `Certificate` objects `READY True`. Four secrets (`argocd-agent-ca`, `argocd-agent-principal-tls`, `argocd-agent-resource-proxy-tls`, `argocd-agent-jwt`). The Principal pod becomes `1/1 Running`. If it stays `0/1`, restart it: `oc rollout restart deployment/openshift-gitops-agent-principal -n "${PRINCIPAL_NS}" --context "${PRINCIPAL_CONTEXT}"`.
 
 Check the log:
 
@@ -146,10 +213,13 @@ oc logs deployment/openshift-gitops-agent-principal -n "${PRINCIPAL_NS}" --conte
 
 Expected output: lines such as "Redis proxy started", "Resource proxy started" and "Namespace informer synced and ready".
 
+Renewals: the upstream docs say the Principal reloads its certificate secrets without a restart. A bad certificate makes it exit, so it will crash-loop instead of serving a broken certificate. Watch the `Certificate` objects, not just the pods.
+
 ## Reset
 
-Disable the Principal by setting `spec.argoCDAgent.principal.enabled: false` and turn the controller back on with `spec.controller.enabled: true`, or restore `${HOME}/hub-argocd.backup.yaml` (remove `resourceVersion`, `uid` and `status` first). Delete the agent namespace and the four secrets if you want a clean start.
+Disable the Principal by setting `spec.argoCDAgent.principal.enabled: false` and turn the controller back on with `spec.controller.enabled: true`, or restore `${HOME}/hub-argocd.backup.yaml` (remove `resourceVersion`, `uid` and `status` first). Delete the agent namespace, the two `Certificate` objects, the `Issuer` and the four secrets if you want a clean start.
 
 ## Documentation
 
 - Red Hat OpenShift GitOps 1.22, *Argo CD Agent installation*, section 1.3 (`rh_gitops_1.22_argocd_agent.md`).
+- Argo CD Agent upstream docs, TLS certificates: https://argocd-agent.readthedocs.io/latest/configuration/tls-certificates/

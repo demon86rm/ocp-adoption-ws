@@ -33,7 +33,7 @@ For "govern everything from one hub", use **managed**.
 
 ## What you will have when you finish
 
-- A Principal running on the hub with certificates from your own CA.
+- A Principal running on the hub, with certificates issued and renewed by cert-manager from your own CA.
 - One spoke registered and connected, with `argocd-agentctl agent list` showing it.
 - A sample application created on the hub and synced onto the spoke.
 - A repeat sheet for adding the next spoke.
@@ -68,5 +68,11 @@ Custom Helm values beyond the install flags, destination-based mapping (mentione
 
 - The Red Hat page spells one key `argocdAgent` (section 1.3, step e). Every other place, and the operator API, uses `argoCDAgent`. This guide uses `argoCDAgent`.
 - The page's verification output for the spoke (section 1.4, step 4) lists the Principal's four secrets. A spoke has `argocd-agent-ca` and `argocd-agent-client-tls`. This guide uses those two.
-- The CLI-generated CA is for development and testing only, per the page. [02-hub-principal](02-hub-principal/README.md) says where to swap in your own PKI.
-- ROSA: no step here is confirmed on ROSA HCP. Installing operators, creating routes, and the managed-service limits on `openshift-*` namespaces need a test on a real cluster first.
+- The Red Hat page builds certificates with `argocd-agentctl pki`, which upstream marks as not for production. This guide uses cert-manager instead (steps 02 and 03). `argocd-agentctl` still registers agents and creates the JWT key.
+- Upstream documents no command to remove an agent. [03-spoke-agent](03-spoke-agent/README.md) Reset lists the manual steps, including the certificate blocklist.
+
+## Platform
+
+Written for any OpenShift 4.x cluster with OpenShift GitOps 1.22.
+
+> **ROSA:** not tested. Before relying on it, check on a real cluster: (1) the operators install and the Principal route is reachable from every spoke over HTTPS with DNS resolving, (2) your login may be `dedicated-admin`, not `cluster-admin`, and some steps use `cluster-admin`, (3) the managed-service limits on `openshift-*` namespaces allow editing the default `ArgoCD` in `openshift-gitops`. If (3) fails, create your own `ArgoCD` in a new namespace and set `PRINCIPAL_NS` and `AGENT_NS` to it.

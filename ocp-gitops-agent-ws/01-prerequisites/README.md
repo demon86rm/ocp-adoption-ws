@@ -6,16 +6,19 @@ Confirm tools, contexts and the hub Argo CD before changing anything. This step 
 
 - Two OpenShift clusters: one hub, one spoke. The spoke must reach the hub's Principal route (or load balancer) over HTTPS, and DNS for the hub host must resolve from the spoke.
 - Red Hat OpenShift GitOps Operator 1.22 installed on both.
+- cert-manager Operator for Red Hat OpenShift installed on the hub.
 - `cluster-admin` on both clusters.
 
 ## 1. Install the tools
 
-**What:** `oc`, `helm` (later than v3.8.0, only needed for the Helm path), and `argocd-agentctl`.
+**What:** `oc`, `jq`, `openssl`, `helm` (later than v3.8.0, only needed for the Helm path), and `argocd-agentctl`.
 
 **Why:** `argocd-agentctl` creates the certificates and registers each spoke.
 
 ```bash
 oc version --client
+jq --version
+openssl version
 helm version --short
 argocd-agentctl version
 ```
@@ -59,13 +62,14 @@ Expected output: `yes` twice.
 ```bash
 oc get csv -n openshift-gitops-operator --context "${PRINCIPAL_CONTEXT}"
 oc get argocd -n "${PRINCIPAL_NS}" --context "${PRINCIPAL_CONTEXT}"
+oc get csv -n cert-manager-operator --context "${PRINCIPAL_CONTEXT}"
 ```
 
-Expected output: a `openshift-gitops-operator` ClusterServiceVersion at 1.22 in `Succeeded`, and an `ArgoCD` named `openshift-gitops`. Repeat both on the spoke with `AGENT_CONTEXT` and `AGENT_NS`.
+Expected output: a `openshift-gitops-operator` ClusterServiceVersion at 1.22 in `Succeeded`, an `ArgoCD` named `openshift-gitops`, and a cert-manager operator ClusterServiceVersion in `Succeeded`. Repeat both on the spoke with `AGENT_CONTEXT` and `AGENT_NS`.
 
 ### Cluster scope and apps in any namespace
 
-The operator makes the default instance cluster-scoped for the namespace in its `ARGOCD_CLUSTER_CONFIG_NAMESPACES` setting. Check it on both clusters:
+On OpenShift GitOps an instance is cluster-scoped when its namespace is listed in the operator's `ARGOCD_CLUSTER_CONFIG_NAMESPACES` environment variable (Red Hat docs: it grants those instances limited extra permissions over cluster-scoped resources). The default instance in `openshift-gitops` is already listed. Check both clusters:
 
 ```bash
 oc get subscription openshift-gitops-operator \

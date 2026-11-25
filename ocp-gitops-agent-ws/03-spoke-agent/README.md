@@ -13,61 +13,90 @@ Pick the mode now and keep it for this spoke: `managed` (hub is the source of tr
 export AGENT_MODE="managed"
 ```
 
-## 1. Register the agent on the hub
+## 1. Issue the agent's client certificate and register it
 
-**What:** Create the agent record, its client identity, and the Argo CD cluster secret the hub uses to reach it.
+**What:** A client certificate for this agent, signed by the hub CA, and the agent record with its Argo CD cluster secret.
 
-**Why:** On the hub, Argo CD does not talk to the spoke's API server. It talks to the Principal's resource proxy, which relays to the agent over the open connection.
+**Why:** The Principal reads the agent name from the certificate common name (`auth: "mtls:CN=([^,]+)"`). On the hub, Argo CD does not talk to the spoke's API server. It talks to the Principal's resource proxy, which relays to the agent over the open connection.
 
 ```bash
+oc apply --context "${PRINCIPAL_CONTEXT}" -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ${AGENT_NAME}-agent
+  namespace: ${PRINCIPAL_NS}
+spec:
+  secretName: ${AGENT_NAME}-agent
+  commonName: ${AGENT_NAME}
+  usages: [client auth, digital signature, key encipherment]
+  duration: 4320h
+  renewBefore: 1440h
+  privateKey: {algorithm: RSA, size: 4096}
+  issuerRef: {name: argocd-agent-ca, kind: Issuer}
+EOF
+
 argocd-agentctl agent create "${AGENT_NAME}" \
   --principal-context "${PRINCIPAL_CONTEXT}" \
   --principal-namespace "${PRINCIPAL_NS}" \
   --resource-proxy-server "openshift-gitops-agent-principal-resource-proxy:9090"
 ```
 
-Expected output: the agent is created. The command creates a client certificate signed by the Principal CA and a cluster secret named `cluster-<AGENT_NAME>` in the Principal namespace. Add `--label key=value` to tag the agent.
+`agent create` registers the agent and creates the cluster secret `cluster-<AGENT_NAME>`. It signs the resource-proxy credential with the CA in `argocd-agent-ca`. `agent create --help` lists flags such as `--days` and the options to reuse existing secrets. Check them on your `argocd-agentctl` version. Add `--label key=value` to tag the agent.
+
+The common name must stay the same on every renewal. A different name is a different agent.
 
 ### Verify
 
 ```bash
+oc get certificate "${AGENT_NAME}-agent" -n "${PRINCIPAL_NS}" --context "${PRINCIPAL_CONTEXT}"
 oc get secret "cluster-${AGENT_NAME}" -n "${PRINCIPAL_NS}" --context "${PRINCIPAL_CONTEXT}"
 argocd-agentctl agent list \
   --principal-namespace "${PRINCIPAL_NS}" \
   --principal-context "${PRINCIPAL_CONTEXT}"
 ```
 
-Expected output: the secret exists and the agent is listed (not connected yet).
+Expected output: the `Certificate` is `READY True`, the secret exists, and the agent is listed (not connected yet).
 
-## 2. Give the spoke the CA and a client certificate
+## 2. Copy the CA certificate and the client certificate to the spoke
 
-**What:** Copy the CA to the spoke, then issue the agent's client certificate.
+**What:** Two secrets in the spoke's Argo CD namespace: `argocd-agent-ca` (public certificate only) and `argocd-agent-client-tls`.
 
-**Why:** The agent verifies the Principal with the CA and proves itself with the client certificate. The certificate CN is the agent name, which the Principal's `auth` regex reads.
+**Why:** The agent verifies the Principal with the CA and proves itself with the client certificate. The CA private key must not leave the hub.
+
+The pipes below move the secrets without writing the private key to disk. Requires `jq`.
 
 ```bash
-argocd-agentctl pki propagate \
-  --agent-context "${AGENT_CONTEXT}" \
-  --principal-context "${PRINCIPAL_CONTEXT}" \
-  --principal-namespace "${PRINCIPAL_NS}" \
-  --agent-namespace "${AGENT_NS}"
+oc get secret "${AGENT_NAME}-agent" -n "${PRINCIPAL_NS}" --context "${PRINCIPAL_CONTEXT}" -o json \
+  | jq '{apiVersion, kind, type: "kubernetes.io/tls",
+         metadata: {name: "argocd-agent-client-tls", namespace: env.AGENT_NS},
+         data: {"tls.crt": .data["tls.crt"], "tls.key": .data["tls.key"]}}' \
+  | oc apply --context "${AGENT_CONTEXT}" -f -
 
-argocd-agentctl pki issue agent "${AGENT_NAME}" \
-  --principal-context "${PRINCIPAL_CONTEXT}" \
-  --agent-context "${AGENT_CONTEXT}" \
-  --agent-namespace "${AGENT_NS}" \
-  --principal-namespace "${PRINCIPAL_NS}"
+oc get secret argocd-agent-ca -n "${PRINCIPAL_NS}" --context "${PRINCIPAL_CONTEXT}" -o json \
+  | jq '{apiVersion, kind, type: "Opaque",
+         metadata: {name: "argocd-agent-ca", namespace: env.AGENT_NS},
+         data: {"tls.crt": .data["tls.crt"], "ca.crt": .data["tls.crt"]}}' \
+  | oc apply --context "${AGENT_CONTEXT}" -f -
 ```
 
-`propagate` creates `argocd-agent-ca` on the spoke (`--force` regenerates). `issue agent` creates `argocd-agent-client-tls` (`--upsert` replaces).
+The CA secret carries the same certificate under both `tls.crt` and `ca.crt`, because the key name the agent reads for its root CA is not stated on the Red Hat page and upstream docs use both. If the agent log says it cannot load the CA, check this first.
 
 ### Verify
 
 ```bash
 oc get secrets -n "${AGENT_NS}" --context "${AGENT_CONTEXT}" | grep agent
+oc get secret argocd-agent-client-tls -n "${AGENT_NS}" --context "${AGENT_CONTEXT}" \
+  -o jsonpath='{.data.tls\.crt}' | base64 --decode | openssl x509 -noout -subject -enddate
+oc get secret argocd-agent-ca -n "${AGENT_NS}" --context "${AGENT_CONTEXT}" \
+  -o jsonpath='{.data.tls\.key}{"\n"}'
 ```
 
-Expected output: `argocd-agent-ca` and `argocd-agent-client-tls`.
+Expected output: `argocd-agent-ca` and `argocd-agent-client-tls` exist. The subject shows `CN=<AGENT_NAME>` and an end date. The last command prints an empty line, which proves the CA private key is not on the spoke.
+
+### Renewal
+
+cert-manager renews `${AGENT_NAME}-agent` on the hub, but nothing copies the new certificate to the spoke. Repeat the first command of this section before the end date, or run it from a scheduled job or your secret-sync tool. The agent picks up a changed secret on its next TLS handshake. If the new certificate is bad it exits instead of keeping the old one.
 
 ## 3. Enable the Agent in the spoke's Argo CD
 
@@ -165,7 +194,13 @@ If any of that is missing, go to the troubleshooting list in [REPEAT.md](../REPE
 
 ## Reset
 
-On the spoke set `spec.argoCDAgent.agent.enabled: false` (or restore `${HOME}/spoke-argocd.backup.yaml` after removing `resourceVersion`, `uid` and `status`) and delete `argocd-agent-ca` and `argocd-agent-client-tls`. On the hub run `argocd-agentctl agent --help` for the remove command in your build, then delete `cluster-${AGENT_NAME}` and the agent namespace.
+On the spoke set `spec.argoCDAgent.agent.enabled: false` (or restore `${HOME}/spoke-argocd.backup.yaml` after removing `resourceVersion`, `uid` and `status`) and delete `argocd-agent-ca` and `argocd-agent-client-tls`.
+
+On the hub, upstream documents no command that removes an agent. Do this by hand:
+
+1. Block the certificate so it can never reconnect: `argocd-agentctl blocklist add <fingerprint>` (the fingerprint comes from the client certificate, `openssl x509 -noout -fingerprint -sha256`).
+2. Delete the `Certificate` `${AGENT_NAME}-agent` and its secret, the secret `cluster-${AGENT_NAME}`, and the namespace `${AGENT_NAME}`.
+3. Remove `${AGENT_NAME}` from `spec.sourceNamespaces` of the hub `ArgoCD` and of your `AppProject`.
 
 ## Documentation
 
