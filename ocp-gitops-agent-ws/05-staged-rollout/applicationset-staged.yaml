@@ -1,0 +1,53 @@
+# applicationset-staged.yaml
+# Purpose: staged rollout. Deploy to env=test first, then to env=prod only after test is Healthy.
+# Needs ARGOCD_APPLICATIONSET_CONTROLLER_ENABLE_PROGRESSIVE_SYNCS=true on the hub ApplicationSet controller.
+# RollingSync drives the sync itself, so the Applications have no automated sync policy.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: fleet-staged
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: gitops-agent-workshop
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchExpressions:
+            - key: env
+              operator: Exists
+  strategy:
+    type: RollingSync
+    rollingSync:
+      steps:
+        - matchExpressions:
+            - key: stage
+              operator: In
+              values: [test]
+        - matchExpressions:
+            - key: stage
+              operator: In
+              values: [prod]
+  template:
+    metadata:
+      name: 'fleet-staged-{{.name}}'
+      labels:
+        app.kubernetes.io/part-of: gitops-agent-workshop
+        stage: '{{ index .metadata.labels "env" }}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/demon86rm/ocp-gitops-fleet-sample
+        targetRevision: HEAD
+        path: 'apps/hello/kustomize/overlays/{{ index .metadata.labels "env" }}'
+      destination:
+        name: '{{.name}}'
+        namespace: fleet-staged
+      syncPolicy:
+        managedNamespaceMetadata:
+          labels:
+            argocd.argoproj.io/managed-by: '{{ index .metadata.labels "gitops-instance" }}'
+        syncOptions:
+          - CreateNamespace=true

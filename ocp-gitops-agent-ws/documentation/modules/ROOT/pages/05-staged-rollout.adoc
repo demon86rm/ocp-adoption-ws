@@ -1,0 +1,218 @@
+= Step 5 - Staged Rollout: Test First, Prod Only If Test Is Healthy
+include::_attributes.adoc[]
+
+Step 4 sends every change to every cluster at once. This step adds an order: clusters tagged `env=test` get a release first, and `env=prod` waits until `test` reports Healthy. A broken release stops at `test`.
+
+== Prerequisites
+
+* xref:04-fleet-tagging.adoc[Step 4] finished, with `env` tags on both clusters.
+* You can push to a copy of the sample repository for the failure test, or use a throwaway branch.
+
+== How It Works
+
+. The `ApplicationSet` `RollingSync` strategy sorts applications into steps by their labels. Here, step 1 is `stage=test` and step 2 is `stage=prod`. The `stage` label is copied from the cluster's `env` tag in the template.
+. The controller syncs step 1, waits for those applications to become `Healthy`, then syncs step 2.
+. `RollingSync` triggers the syncs itself, so the applications carry no `automated` sync policy. That also means no automatic `selfHeal` or `prune` on them.
+
+WARNING: Progressive syncs are an alpha feature of the `ApplicationSet` controller and sit behind a flag. Check the support status for your OpenShift GitOps version before you use it in production.
+
+== Steps to Apply
+
+[#enable]
+=== 1. Turn on progressive syncs
+
+icon:clock[] ~45 seconds (the controller restarts)
+
+*What:* Set `ARGOCD_APPLICATIONSET_CONTROLLER_ENABLE_PROGRESSIVE_SYNCS=true` on the hub's `ApplicationSet` controller.
+
+*Why:* Without the flag the `strategy` in an `ApplicationSet` is ignored.
+
+[.console-input]
+[source,bash]
+----
+oc patch argocd openshift-gitops -n openshift-gitops --context hub --type merge \
+  --patch-file 05-staged-rollout/argocd-progressive-sync-patch.yaml
+----
+
+.Verify: the controller restarted
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc get pods -n openshift-gitops --context hub | grep applicationset
+----
+
+[.console-output]
+[source,bash]
+----
+openshift-gitops-applicationset-controller-...   1/1   Running
+----
+====
+
+'''
+
+[#create]
+=== 2. Create the staged ApplicationSet
+
+icon:clock[] ~1 minute; prod started about 17 seconds after test (measured once)
+
+*What:* Apply `05-staged-rollout/applicationset-staged.yaml`.
+
+*Why:* One object now defines both the placement (by tag) and the order.
+
+[.console-input]
+[source,bash]
+----
+oc apply -f 05-staged-rollout/applicationset-staged.yaml --context hub
+----
+
+.Verify: test finished before prod started
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc get applicationset fleet-staged -n openshift-gitops --context hub \
+  -o jsonpath='{range .status.applicationStatus[*]}{.application} step={.step} {.status}{"\n"}{end}'
+for a in spoke-a spoke-b; do
+  oc get application.argoproj.io fleet-staged-$a -n openshift-gitops --context hub \
+    -o jsonpath='{.status.operationState.startedAt}{"\n"}'
+done
+----
+
+[.console-output]
+[source,bash]
+----
+fleet-staged-spoke-a step=1 Healthy
+fleet-staged-spoke-b step=2 Healthy
+2026-11-26T16:57:32Z
+2026-11-26T16:57:49Z
+----
+
+The `spoke-b` (prod) sync starts after the `spoke-a` (test) one.
+====
+
+'''
+
+[#gate]
+=== 3. Break a release and watch it stop at test
+
+icon:clock[] ~2 minutes
+
+*What:* Point the staged set at a revision whose image tag does not exist.
+
+*Why:* This is the reason for staging. The failure shows up on `test` and `prod` keeps running the last good version.
+
+Create a branch in your copy of the sample repository, change the image in `apps/hello/kustomize/base/deployment.yaml` to a tag that does not exist, and push it. Then:
+
+[.console-input]
+[source,bash]
+----
+oc patch applicationset fleet-staged -n openshift-gitops --context hub --type json \
+  -p '[{"op":"replace","path":"/spec/template/spec/source/targetRevision","value":"<your-broken-branch>"}]'
+----
+
+.Verify: test is unhealthy, prod is waiting and unchanged
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc get applicationset fleet-staged -n openshift-gitops --context hub \
+  -o jsonpath='{range .status.applicationStatus[*]}{.application} step={.step} {.status}{"\n"}{end}'
+oc get pods -n fleet-staged --context spoke-a
+oc get deploy hello -n fleet-staged --context spoke-b -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+----
+
+[.console-output]
+[source,bash]
+----
+fleet-staged-spoke-a step=1 Progressing
+fleet-staged-spoke-b step=2 Waiting
+
+hello-...   1/1   Running
+hello-...   0/1   ImagePullBackOff
+
+registry.access.redhat.com/ubi9/httpd-24:latest
+----
+
+`test` keeps its old pod running while the new one fails, and `prod` still runs the good image.
+====
+
+Roll back by pointing the revision at the good one again:
+
+[.console-input]
+[source,bash]
+----
+oc patch applicationset fleet-staged -n openshift-gitops --context hub --type json \
+  -p '[{"op":"replace","path":"/spec/template/spec/source/targetRevision","value":"HEAD"}]'
+----
+
+.Verify: both applications are healthy again
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc get application.argoproj.io -n openshift-gitops --context hub | grep fleet-staged
+----
+
+[.console-output]
+[source,bash]
+----
+fleet-staged-spoke-a   Synced   Healthy
+fleet-staged-spoke-b   Synced   Healthy
+----
+====
+
+'''
+
+== What This Solves (Compared to Step 4)
+
+[cols="2,3",options="header"]
+|===
+| Problem from Step 4 | How This Step Solves It
+| A bad release reaches every cluster at once | Prod waits until test is Healthy
+| Order lives in people's heads | The order is in the `ApplicationSet`
+|===
+
+== What This Does NOT Solve (Yet)
+
+[cols="2,3",options="header"]
+|===
+| Remaining Problem | Addressed In
+| "Healthy" only means pods are up, not that the release is correct | Add smoke tests or a manual approval outside this workshop
+| Any team can deploy to any cluster | Teams and projects (to be added)
+| Staged apps do not self-heal or prune | Run an unstaged `ApplicationSet` next to it for those, or add sync policy once the feature is stable
+|===
+
+== Official Documentation
+
+* link:{gitops-docs}[Red Hat OpenShift GitOps {gitops-version} documentation]
+
+== Alternatives Considered
+
+[cols="2,4",options="header"]
+|===
+| Approach | Notes
+| `RollingSync` (this step) | Order and gate in one object. Alpha
+| Sync waves | Order inside one application, not across clusters
+| Separate `ApplicationSet` per environment, promoted by a pull request | Plain and reviewable. You promote by changing a revision
+|===
+
+'''
+
+== Reset
+
+[.console-input]
+[source,bash]
+----
+oc delete -f 05-staged-rollout/applicationset-staged.yaml --context hub --ignore-not-found --wait
+oc delete namespace fleet-staged --context spoke-a --ignore-not-found
+oc delete namespace fleet-staged --context spoke-b --ignore-not-found
+oc patch argocd openshift-gitops -n openshift-gitops --context hub --type merge \
+  -p '{"spec":{"applicationSet":{"env":null}}}'
+----
+
+The order matters: delete the `ApplicationSet` first so it cannot recreate the namespaces, then turn the flag off.

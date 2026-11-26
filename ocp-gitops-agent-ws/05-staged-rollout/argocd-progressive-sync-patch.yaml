@@ -1,0 +1,8 @@
+# argocd-progressive-sync-patch.yaml
+# Purpose: turn on progressive syncs (RollingSync) in the hub ApplicationSet controller.
+# The feature is behind a flag. A merge patch replaces spec.applicationSet.env, so keep any env you already set.
+spec:
+  applicationSet:
+    env:
+      - name: ARGOCD_APPLICATIONSET_CONTROLLER_ENABLE_PROGRESSIVE_SYNCS
+        value: "true"

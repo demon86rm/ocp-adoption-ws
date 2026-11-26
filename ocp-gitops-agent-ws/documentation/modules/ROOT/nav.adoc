@@ -19,3 +19,7 @@
 ** xref:04-fleet-tagging.adoc#kustomize-set[Kustomize per Tag]
 ** xref:04-fleet-tagging.adoc#helm-set[Helm per Tag]
 ** xref:04-fleet-tagging.adoc#select-by-tag[Choose Clusters by Tag]
+* xref:05-staged-rollout.adoc[Step 5: Staged Rollout]
+** xref:05-staged-rollout.adoc#enable[Turn on Progressive Syncs]
+** xref:05-staged-rollout.adoc#create[Staged ApplicationSet]
+** xref:05-staged-rollout.adoc#gate[Break a Release]
