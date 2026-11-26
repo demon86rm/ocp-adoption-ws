@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Multi-cluster GitOps with the Argo CD Agent :: OpenShift Adoption Workshops</title>
+    <link rel="canonical" href="https://demon86rm.github.io/ocp-adoption-ws/ocp-gitops-agent/09-rhacm-comparison.html">
+    <link rel="prev" href="08-production-certificates.html">
+    <meta name="generator" content="Antora 3.0.0">
+    <link rel="stylesheet" href="../_/css/site.css">
+  </head>
+  <body class="article">
+<header class="header">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="https://developers.redhat.com" target="_blank"><img src="../_/img/RHDLogo.svg" height="40px" alt="Red Hat Developer Program"></a>
+      <a class="navbar-item" style="font-size: 24px; color: white" href="https://demon86rm.github.io/ocp-adoption-ws">OpenShift Adoption Workshops</a>
+      <button class="navbar-burger" data-target="topbar-nav">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+    <div id="topbar-nav" class="navbar-menu">
+      <div class="navbar-end">
+        <a class="navbar-item" href="https://developers.redhat.com/ebooks/" target="_blank">Books</a>
+        <a class="navbar-item" href="https://developers.redhat.com/cheatsheets/" target="_blank">Cheat Sheets</a>
+        <a class="navbar-item" href="https://developers.redhat.com/events/" target="_blank">Upcoming Events</a>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">More Tutorials</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/kubernetes-tutorial/" target="_blank">Kubernetes</a>
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/istio-tutorial/" target="_blank">Istio</a>
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/quarkus-tutorial/" target="_blank">Quarkus</a>
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/knative-tutorial/" target="_blank">Knative</a>
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/tekton-tutorial/" target="_blank">Tekton</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+</header>
+<div class="body">
+<div class="nav-container" data-component="ocp-gitops-agent" data-version="master">
+  <aside class="nav">
+    <div class="panels">
+<div class="nav-panel-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <h3 class="title"><a href="index.html"></a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+<ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="index.html">Overview</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="00-setup.html">Setup</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="00-setup.html#prerequisites">Prerequisites</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="00-setup.html#login-clusters">Log In to Clusters</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="00-setup.html#install-operator">Install OpenShift GitOps</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="00-setup.html#export-variables">Export Variables</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="01-hub-principal.html">Step 1: Hub Principal</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="01-hub-principal.html#enable-principal">Enable the Principal</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="01-hub-principal.html#lab-pki">Lab Certificates and JWT Key</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="02-register-spokes.html">Step 2: Register Spokes</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="02-register-spokes.html#register-agent">Register an Agent</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="02-register-spokes.html#copy-certs">Copy Certificates</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="02-register-spokes.html#enable-agent">Enable the Agent</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="02-register-spokes.html#confirm">Confirm the Connection</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="03-first-application.html">Step 3: First Application</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="03-first-application.html#deploy">Deploy from the Hub</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="04-fleet-tagging.html">Step 4: Fleet Tagging</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#tag-instance">Tag the Clusters</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#kustomize-set">Kustomize per Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#helm-set">Helm per Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#select-by-tag">Choose Clusters by Tag</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="05-staged-rollout.html">Step 5: Staged Rollout</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#enable">Turn on Progressive Syncs</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#create">Staged ApplicationSet</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#gate">Break a Release</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="06-teams-projects.html">Step 6: Teams and Projects</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#create-projects">Project per Environment</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#use-projects">Projects from the Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#boundaries">Try to Break the Boundaries</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="07-secrets-bootstrap.html">Step 7: Secrets and Bootstrap</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="07-secrets-bootstrap.html#install">Install External Secrets</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="07-secrets-bootstrap.html#grant">Grant Argo CD Rights</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="07-secrets-bootstrap.html#store">Secret Store per Cluster</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="07-secrets-bootstrap.html#demo">Use a Secret</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="07-secrets-bootstrap.html#bootstrap">Bootstrap a New Spoke</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="08-production-certificates.html">Step 8: Production Certificates</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="08-production-certificates.html#server-certs">Principal Certificates</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="08-production-certificates.html#agent-certs">Agent Certificates</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="08-production-certificates.html#rotation">What Renews</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item is-current-page" data-depth="1">
+    <a class="nav-link" href="09-rhacm-comparison.html">Step 9: Compared with RHACM</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+    </div>
+  </aside>
+</div>
+<main class="article">
+<div class="toolbar" role="navigation">
+<button class="nav-toggle"></button>
+  <a href="index.html" class="home-link"></a>
+<nav class="breadcrumbs" aria-label="breadcrumbs">
+  <ul>
+    <li><a href="index.html">Multi-cluster GitOps with the Argo CD Agent</a></li>
+    <li><a href="09-rhacm-comparison.html">Step 9: Compared with RHACM</a></li>
+  </ul>
+</nav>
+  <div class="edit-this-page"><a href="https://github.com/demon86rm/ocp-adoption-ws/edit/main/ocp-gitops-agent-ws/documentation/modules/ROOT/pages/09-rhacm-comparison.adoc">Edit this Page</a></div>
+  </div>
+  <div class="content">
+<article class="doc">
+<h1 class="page">Multi-cluster GitOps with the Argo CD Agent</h1>
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>This workshop built multi-cluster application delivery for a small fleet with Argo CD, the Argo CD Agent and <code>ApplicationSet</code>. It is an alternative to one part of Red Hat Advanced Cluster Management for Kubernetes (RHACM), not to all of it. This page says which part, so you can tell when a small fleet outgrows it.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+This page compares from product documentation and from what the workshop ran. The workshop did not run RHACM. Check the current RHACM documentation and your entitlements before you decide.
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_what_you_built_and_what_it_covers"><a class="anchor" href="#_what_you_built_and_what_it_covers"></a>What you built, and what it covers</h2>
+<div class="sectionbody">
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 28.5714%;">
+<col style="width: 42.8571%;">
+<col style="width: 28.5715%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Need</th>
+<th class="tableblock halign-left valign-top">Built here</th>
+<th class="tableblock halign-left valign-top">Tested</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Deliver an application to many clusters from one place</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>ApplicationSet</code> on the hub, agents on the spokes</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Steps 3 and 4</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Choose clusters by tag</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Labels on the cluster secrets, cluster generator</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Step 4</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Different settings per environment</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Helm values file or Kustomize overlay chosen by the tag</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Step 4</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Staged rollout with a gate</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>RollingSync</code> (alpha)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Step 5</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Limit who deploys where</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>AppProject</code> per environment</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Step 6</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Secrets that stay out of Git</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">External Secrets Operator on each spoke</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Step 7</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Production-grade certificates</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">cert-manager</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Step 8</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">No hub credentials for spoke API servers</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Spokes connect out to the Principal</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Steps 1 and 2</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_what_it_does_not_cover"><a class="anchor" href="#_what_it_does_not_cover"></a>What it does not cover</h2>
+<div class="sectionbody">
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 66.6667%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Capability</th>
+<th class="tableblock halign-left valign-top">Where it lives</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Create, upgrade and destroy clusters</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RHACM cluster lifecycle management. Here you create clusters yourself</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Fleet-wide policy and compliance reporting</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RHACM governance policies. Here only <code>AppProject</code> limits and what you build yourself</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">One view of health and metrics for all clusters</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RHACM observability. Here the Argo CD UI shows application state only</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Multi-cluster console and search</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RHACM console. Here the hub UI shows Argo CD objects only</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Cross-cluster networking</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Separate tooling. Not part of this setup</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_when_to_outgrow_it"><a class="anchor" href="#_when_to_outgrow_it"></a>When to outgrow it</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p>You have more clusters than you can tag and think about by hand. The workshop targets roughly 3 to 6.</p>
+</li>
+<li>
+<p>You must prove the same configuration or policy on every cluster, with a report.</p>
+</li>
+<li>
+<p>You create and retire clusters often and want that automated too.</p>
+</li>
+<li>
+<p>You need one place for metrics and alerts across clusters.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>RHACM can also drive Argo CD `ApplicationSet`s with its own placement, so moving up later does not have to throw away what you built. Check the documentation for how.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_things_to_confirm_before_you_rely_on_this"><a class="anchor" href="#_things_to_confirm_before_you_rely_on_this"></a>Things to confirm before you rely on this</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p>Support status of the Argo CD Agent in your OpenShift GitOps version. The Red Hat page this workshop follows does not state it.</p>
+</li>
+<li>
+<p><code>RollingSync</code> is alpha and behind a flag.</p>
+</li>
+<li>
+<p>The <code>argocd-agentctl</code> PKI commands are for development and testing only (step 8 replaces them).</p>
+</li>
+<li>
+<p>The agent and Principal versions can differ. The test clusters ran a Principal and agents reporting 0.10.0 with a 0.11.0 command-line tool.</p>
+</li>
+<li>
+<p>Everything ran once, on two ROSA HCP clusters in one AWS account. Nothing here is a load or failure-mode test.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_official_documentation"><a class="anchor" href="#_official_documentation"></a>Official Documentation</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p><a href="https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/">Red Hat Advanced Cluster Management for Kubernetes documentation</a></p>
+</li>
+<li>
+<p><a href="https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/">Red Hat OpenShift GitOps 1.22 documentation</a></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<nav class="pagination">
+  <span class="prev"><a href="08-production-certificates.html">Step 8: Production Certificates</a></span>
+</nav>
+</article>
+<aside class="toc sidebar" data-title="Contents" data-levels="2">
+  <div class="toc-menu"></div>
+</aside>
+  </div>
+</main>
+</div>
+<footer class="footer">
+  <a class="rhd-logo" href="https://developers.redhat.com" target="_blank"></div>
+</footer>
+<script src="../_/js/vendor/clipboard.js"></script>
+<script src="../_/js/site.js"></script>
+<script async src="../_/js/vendor/highlight.js"></script>
+  </body>
+</html>

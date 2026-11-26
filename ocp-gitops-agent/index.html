@@ -158,6 +158,45 @@
   </li>
 </ul>
   </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="07-secrets-bootstrap.html">Step 7: Secrets and Bootstrap</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="07-secrets-bootstrap.html#install">Install External Secrets</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="07-secrets-bootstrap.html#grant">Grant Argo CD Rights</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="07-secrets-bootstrap.html#store">Secret Store per Cluster</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="07-secrets-bootstrap.html#demo">Use a Secret</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="07-secrets-bootstrap.html#bootstrap">Bootstrap a New Spoke</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="08-production-certificates.html">Step 8: Production Certificates</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="08-production-certificates.html#server-certs">Principal Certificates</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="08-production-certificates.html#agent-certs">Agent Certificates</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="08-production-certificates.html#rotation">What Renews</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="09-rhacm-comparison.html">Step 9: Compared with RHACM</a>
+  </li>
 </ul>
   </li>
 </ul>
@@ -194,7 +233,7 @@
 <i class="fa icon-important" title="Important"></i>
 </td>
 <td class="content">
-Draft. Steps 0 to 6 (except the RBAC section of step 6) were run once on two ROSA HCP clusters (OpenShift 5.0.1, OpenShift GitOps 1.22.4, <code>argocd-agentctl</code> 0.11.0). Later steps are not written yet. Timings are single measurements.
+Draft. Steps 0 to 8 (except the RBAC section of step 6) were run once on two ROSA HCP clusters (OpenShift 5.0.1, OpenShift GitOps 1.22.4, <code>argocd-agentctl</code> 0.11.0). Later steps are not written yet. Timings are single measurements.
 </td>
 </tr>
 </table>
@@ -281,12 +320,35 @@ Draft. Steps 0 to 6 (except the RBAC section of step 6) were run once on two ROS
 </li>
 </ul>
 </div>
+<div class="ulist tile">
+<div class="title"><a href="07-secrets-bootstrap.html" class="xref page">Step 7: Secrets and Bootstrap</a></div>
+<ul>
+<li>
+<p><a href="07-secrets-bootstrap.html#demo" class="xref page">Use a Secret</a></p>
+</li>
+<li>
+<p><a href="07-secrets-bootstrap.html#bootstrap" class="xref page">Bootstrap a New Spoke</a></p>
+</li>
+</ul>
+</div>
+<div class="ulist tile">
+<div class="title"><a href="08-production-certificates.html" class="xref page">Step 8: Production Certificates</a></div>
+<ul>
+<li>
+<p><a href="08-production-certificates.html#agent-certs" class="xref page">Agent Certificates</a></p>
+</li>
+<li>
+<p><a href="08-production-certificates.html#rotation" class="xref page">What Renews</a></p>
+</li>
+</ul>
 </div>
 </div>
-<div class="sect1">
+</div>
+<div class="sect1 tile">
 <h2>How it fits together</h2>
 <div class="sectionbody">
 <div class="listingblock">
+<div class="title"><a href="09-rhacm-comparison.html" class="xref page">Step 9: Compared with RHACM</a></div>
 <div class="content">
 <pre class="highlightjs highlight"><code class="language-text hljs" data-lang="text">            hub cluster                                spoke cluster (x2)
   +-------------------------------+            +----------------------------+

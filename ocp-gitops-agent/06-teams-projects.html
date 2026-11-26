@@ -6,6 +6,7 @@
     <title>Multi-cluster GitOps with the Argo CD Agent :: OpenShift Adoption Workshops</title>
     <link rel="canonical" href="https://demon86rm.github.io/ocp-adoption-ws/ocp-gitops-agent/06-teams-projects.html">
     <link rel="prev" href="05-staged-rollout.html">
+    <link rel="next" href="07-secrets-bootstrap.html">
     <meta name="generator" content="Antora 3.0.0">
     <link rel="stylesheet" href="../_/css/site.css">
   </head>
@@ -157,6 +158,45 @@
     <a class="nav-link" href="#boundaries">Try to Break the Boundaries</a>
   </li>
 </ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="07-secrets-bootstrap.html">Step 7: Secrets and Bootstrap</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="07-secrets-bootstrap.html#install">Install External Secrets</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="07-secrets-bootstrap.html#grant">Grant Argo CD Rights</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="07-secrets-bootstrap.html#store">Secret Store per Cluster</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="07-secrets-bootstrap.html#demo">Use a Secret</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="07-secrets-bootstrap.html#bootstrap">Bootstrap a New Spoke</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="08-production-certificates.html">Step 8: Production Certificates</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="08-production-certificates.html#server-certs">Principal Certificates</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="08-production-certificates.html#agent-certs">Agent Certificates</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="08-production-certificates.html#rotation">What Renews</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="09-rhacm-comparison.html">Step 9: Compared with RHACM</a>
   </li>
 </ul>
   </li>
@@ -514,6 +554,7 @@ oc delete -f 06-teams-projects/appprojects-env.yaml --context hub --ignore-not-f
 </div>
 <nav class="pagination">
   <span class="prev"><a href="05-staged-rollout.html">Step 5: Staged Rollout</a></span>
+  <span class="next"><a href="07-secrets-bootstrap.html">Step 7: Secrets and Bootstrap</a></span>
 </nav>
 </article>
 <aside class="toc sidebar" data-title="Contents" data-levels="2">
