@@ -1,0 +1,254 @@
+= Step 2 - Register Spokes: Identity, Tags and the Agent
+include::_attributes.adoc[]
+
+This step registers `spoke-a` and `spoke-b` on the hub, gives each a client certificate, and enables the Agent in each spoke's Argo CD. Each spoke gets a tag (`env=test`, `env=prod`) that step 4 uses to decide where an application goes.
+
+== Prerequisites
+
+* xref:01-hub-principal.adoc[Step 1] finished: the Principal pod is `1/1 Running`, the namespaces `spoke-a` and `spoke-b` exist on the hub.
+* `PRINCIPAL_DNS` is exported in this shell (see step 1, section 1).
+
+WARNING: The `--label` option below is documented on the Red Hat page as "optional metadata labels for the Agent". Whether it puts the label on the Argo CD cluster secret, and which value format it expects, is not validated. Step 4 depends on it. Run the check at the end of section 1 before you go on.
+
+== How It Works
+
+. `argocd-agentctl agent create` registers the agent and creates the Argo CD cluster secret `cluster-<agent>` on the hub.
+. `argocd-agentctl pki propagate` copies the CA certificate to the spoke. `pki issue agent` creates the agent's client certificate with the agent name as common name.
+. The spoke's Argo CD gets `spec.argoCDAgent.agent`, in managed mode, pointing at the Principal route.
+
+== Steps to Apply
+
+Do sections 1 to 4 for `spoke-a` first, then repeat them for `spoke-b` with the values in the second row of each command.
+
+[#register-agent]
+=== 1. Register the agent on the hub
+
+*What:* Create the agent record and its cluster secret, with a tag.
+
+*Why:* The tag becomes the selector that decides which clusters receive an application in step 4. In managed mode, Argo CD reaches the spoke through the Principal's resource proxy, never through the spoke's API server.
+
+[.console-input]
+[source,bash]
+----
+argocd-agentctl agent create spoke-a \
+  --principal-context hub --principal-namespace openshift-gitops \
+  --resource-proxy-server openshift-gitops-agent-principal-resource-proxy:9090 \
+  --label env=test
+
+argocd-agentctl agent create spoke-b \
+  --principal-context hub --principal-namespace openshift-gitops \
+  --resource-proxy-server openshift-gitops-agent-principal-resource-proxy:9090 \
+  --label env=prod
+----
+
+.Verify: both agents are registered and the cluster secrets carry the label
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+argocd-agentctl agent list \
+  --principal-namespace openshift-gitops --principal-context hub
+oc get secret cluster-spoke-a cluster-spoke-b -n openshift-gitops --context hub \
+  --show-labels
+----
+
+[.console-output]
+[source,bash]
+----
+(agent list shows spoke-a and spoke-b, not connected yet)
+
+NAME             TYPE     ...   LABELS
+cluster-spoke-a  Opaque   ...   argocd.argoproj.io/secret-type=cluster,env=test,...
+cluster-spoke-b  Opaque   ...   argocd.argoproj.io/secret-type=cluster,env=prod,...
+----
+
+If `env=...` is not in the labels, add it by hand and note it for the workshop:
+`oc label secret cluster-spoke-a env=test -n openshift-gitops --context hub`.
+====
+
+'''
+
+[#copy-certs]
+=== 2. Give each spoke the CA and a client certificate
+
+*What:* Two secrets in the spoke's `openshift-gitops` namespace: `argocd-agent-ca` and `argocd-agent-client-tls`.
+
+*Why:* The agent verifies the Principal with the CA and proves its own identity with the client certificate.
+
+[.console-input]
+[source,bash]
+----
+argocd-agentctl pki propagate \
+  --principal-context hub --principal-namespace openshift-gitops \
+  --agent-context spoke-a --agent-namespace openshift-gitops
+argocd-agentctl pki issue agent spoke-a \
+  --principal-context hub --principal-namespace openshift-gitops \
+  --agent-context spoke-a --agent-namespace openshift-gitops
+
+argocd-agentctl pki propagate \
+  --principal-context hub --principal-namespace openshift-gitops \
+  --agent-context spoke-b --agent-namespace openshift-gitops
+argocd-agentctl pki issue agent spoke-b \
+  --principal-context hub --principal-namespace openshift-gitops \
+  --agent-context spoke-b --agent-namespace openshift-gitops
+----
+
+.Verify: the spoke has the CA and a client certificate named after the agent
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc get secrets -n openshift-gitops --context spoke-a | grep agent
+oc get secret argocd-agent-client-tls -n openshift-gitops --context spoke-a \
+  -o jsonpath='{.data.tls\.crt}' | base64 --decode | openssl x509 -noout -subject -enddate
+----
+
+[.console-output]
+[source,bash]
+----
+argocd-agent-ca           kubernetes.io/tls
+argocd-agent-client-tls   kubernetes.io/tls
+subject=CN=spoke-a
+notAfter=...
+----
+
+Repeat with `--context spoke-b`. The subject must be `CN=spoke-b`.
+====
+
+NOTE: Which key name the agent reads for its CA (`tls.crt` or `ca.crt`) is not stated on the Red Hat page. `pki propagate` sets what the tool expects, so use it as is. If the agent later logs that it cannot load the CA, check this first.
+
+'''
+
+[#enable-agent]
+=== 3. Enable the Agent in each spoke's Argo CD
+
+icon:clock[] timing not measured yet
+
+*What:* Merge the Agent settings into the spoke `ArgoCD`, in managed mode, and turn off the spoke's web server.
+
+*Why:* The spoke keeps the application controller, repo-server and Redis. Users work in the hub UI, so the spoke server is not needed.
+
+The patch file contains `${PRINCIPAL_DNS}`, so `envsubst` fills it in. A plain `oc patch --patch-file` would apply the literal text.
+
+[.console-input]
+[source,bash]
+----
+oc get argocd openshift-gitops -n openshift-gitops --context spoke-a -o yaml > spoke-a-argocd.backup.yaml
+oc patch argocd openshift-gitops -n openshift-gitops --context spoke-a \
+  --type merge --patch "$(envsubst < 02-register-spokes/argocd-agent-patch.yaml)"
+
+oc get argocd openshift-gitops -n openshift-gitops --context spoke-b -o yaml > spoke-b-argocd.backup.yaml
+oc patch argocd openshift-gitops -n openshift-gitops --context spoke-b \
+  --type merge --patch "$(envsubst < 02-register-spokes/argocd-agent-patch.yaml)"
+----
+
+.Verify: the agent pod runs next to the controller
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc get pods -n openshift-gitops --context spoke-a
+----
+
+[.console-output]
+[source,bash]
+----
+openshift-gitops-agent-agent-...                  1/1   Running
+openshift-gitops-application-controller-0         1/1   Running
+openshift-gitops-redis-...                        1/1   Running
+openshift-gitops-repo-server-...                  1/1   Running
+----
+====
+
+NOTE: Autonomous mode (the spoke is the source of truth) uses `mode: autonomous` and needs a `default` `AppProject` in the spoke. This workshop uses managed mode on every spoke, so it is not covered here.
+
+'''
+
+[#confirm]
+=== 4. Confirm the connection from both sides
+
+*What:* Read the agent log, the Principal log and the agent list.
+
+*Why:* A connected agent shows up on both ends. If one side is silent, the other log tells you why.
+
+[.console-input]
+[source,bash]
+----
+oc logs deployment/openshift-gitops-agent-agent -n openshift-gitops --context spoke-a --tail 20
+oc logs deployment/openshift-gitops-agent-principal -n openshift-gitops --context hub --tail 10
+argocd-agentctl agent list \
+  --principal-namespace openshift-gitops --principal-context hub
+----
+
+.Verify: both spokes show as connected
+[%collapsible]
+====
+[.console-output]
+[source,bash]
+----
+(agent log)     Authentication successful
+(agent log)     Starting to send events to event stream
+(principal log) An agent connected to the subscription stream
+(agent list)    spoke-a  connected
+                spoke-b  connected
+----
+
+Common failures: `x509` host mismatch means `--dns` in step 1 did not equal `PRINCIPAL_DNS`. An unknown or denied agent means the certificate common name differs from the agent name.
+====
+
+'''
+
+== What This Solves (Compared to Step 1)
+
+[cols="2,3",options="header"]
+|===
+| Problem from Step 1 | How This Step Solves It
+| The Principal waits and no spoke is connected | Each spoke dials out with its own certificate
+| Spokes cannot be told apart for placement | Each agent carries a tag on its cluster secret
+|===
+
+== What This Does NOT Solve (Yet)
+
+[cols="2,3",options="header"]
+|===
+| Remaining Problem | Addressed In
+| Nothing is deployed yet | xref:03-first-application.adoc[Step 3]
+| Certificates are lab-grade and do not renew | Production certificates module (to be added)
+|===
+
+== Official Documentation
+
+* link:{gitops-docs}[Red Hat OpenShift GitOps {gitops-version}, Argo CD Agent installation, chapter 1]
+
+== Alternatives Considered
+
+[cols="2,4",options="header"]
+|===
+| Approach | Notes
+| Managed agents (this step) | Hub is the source of truth. Fits "one team governs all clusters"
+| Autonomous agents | Spoke owns its applications and the hub only watches. Fits independent teams
+| Argo CD hub with direct cluster secrets | No agent needed, but the hub holds credentials for every spoke API server and must reach them
+|===
+
+'''
+
+== Reset
+
+Undo in reverse order. Disable the agent on each spoke, remove its secrets, then remove the registration on the hub.
+
+[.console-input]
+[source,bash]
+----
+oc patch argocd openshift-gitops -n openshift-gitops --context spoke-b --type merge \
+  -p '{"spec":{"argoCDAgent":{"agent":{"enabled":false}},"server":{"enabled":true}}}'
+oc patch argocd openshift-gitops -n openshift-gitops --context spoke-a --type merge \
+  -p '{"spec":{"argoCDAgent":{"agent":{"enabled":false}},"server":{"enabled":true}}}'
+oc delete secret argocd-agent-client-tls argocd-agent-ca -n openshift-gitops --context spoke-b --ignore-not-found
+oc delete secret argocd-agent-client-tls argocd-agent-ca -n openshift-gitops --context spoke-a --ignore-not-found
+oc delete secret cluster-spoke-b cluster-spoke-a -n openshift-gitops --context hub --ignore-not-found
+----
+
+NOTE: Upstream documents no command that removes an agent. To stop a certificate from ever reconnecting, add its fingerprint to the blocklist with `argocd-agentctl blocklist add <fingerprint>` (get it with `openssl x509 -noout -fingerprint -sha256`). The agent namespace on the hub is removed with step 1's reset.

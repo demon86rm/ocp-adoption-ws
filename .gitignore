@@ -1,3 +1,18 @@
 # Customer-specific notes: kept on disk, never committed
 compass-*.md
 MEMORY.md
+
+# Personal environment and generated material
+.DS_Store
+t/
+myenv.sh
+pki/
+*.key
+
+# Antora / Node.js
+node_modules/
+.cache/
+gh-pages/
+package-lock.json
+yarn.lock
+yarn-error.log

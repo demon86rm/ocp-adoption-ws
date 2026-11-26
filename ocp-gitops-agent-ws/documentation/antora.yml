@@ -1,0 +1,6 @@
+name: ocp-gitops-agent
+title: "Multi-cluster GitOps with the Argo CD Agent"
+version: master
+nav:
+  - modules/ROOT/nav.adoc
+start_page: ROOT:index.adoc

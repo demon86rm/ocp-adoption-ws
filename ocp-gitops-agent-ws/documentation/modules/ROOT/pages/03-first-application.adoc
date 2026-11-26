@@ -1,0 +1,125 @@
+= Step 3 - First Application: Deploy from the Hub to a Spoke
+include::_attributes.adoc[]
+
+This step creates one `Application` on the hub and watches it reach `spoke-a`. It proves the whole chain before the fleet steps add tags, Helm and Kustomize.
+
+== Prerequisites
+
+* xref:02-register-spokes.adoc[Step 2] finished: both agents show as connected.
+* The sample repository below is the Red Hat getting-started repository. It is public. Swap in your own repository when you have one.
+
+== How It Works
+
+In managed mode the Principal sends every application found in a hub namespace to the agent with the same name. `destination.name` is the agent name. Anything changed by hand on the spoke is reverted by `selfHeal`.
+
+== Steps to Apply
+
+[#deploy]
+=== 1. Create the Application on the hub
+
+icon:clock[] timing not measured yet
+
+*What:* Apply `03-first-application/application-managed.yaml` in the hub namespace `spoke-a`.
+
+*Why:* The namespace selects the agent. The `Application` object is the only thing you create. The workload appears on the spoke.
+
+[.console-input]
+[source,bash]
+----
+oc apply -f 03-first-application/application-managed.yaml -n spoke-a --context hub
+----
+
+.Verify: the hub application is Synced and Healthy, a copy and the workload exist on the spoke
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc get application.argoproj.io my-demo-app -n spoke-a --context hub
+oc get application.argoproj.io my-demo-app -n openshift-gitops --context spoke-a
+oc get all -n my-app --context spoke-a
+----
+
+[.console-output]
+[source,bash]
+----
+NAME          SYNC STATUS   HEALTH STATUS
+my-demo-app   Synced        Healthy
+----
+
+The hub UI shows the application and its live resources through the resource proxy.
+====
+
+'''
+
+=== 2. Check that self-heal reverts a manual change
+
+*What:* Delete a deployment on the spoke and watch it come back.
+
+*Why:* This is the difference between managed mode and "someone installed it once". The hub copy is the source of truth.
+
+[.console-input]
+[source,bash]
+----
+oc delete deployment --all -n my-app --context spoke-a
+oc get deployment -n my-app --context spoke-a --watch
+----
+
+.Verify: the deployment is recreated
+[%collapsible]
+====
+[.console-output]
+[source,bash]
+----
+NAME   READY   UP-TO-DATE   AVAILABLE
+...    1/1     1            1
+----
+====
+
+'''
+
+== What This Solves (Compared to Step 2)
+
+[cols="2,3",options="header"]
+|===
+| Problem from Step 2 | How This Step Solves It
+| Connected spokes, nothing running | One hub-side `Application` creates a workload on a spoke
+| Manual change on a spoke | `selfHeal` reverts it
+|===
+
+== What This Does NOT Solve (Yet)
+
+[cols="2,3",options="header"]
+|===
+| Remaining Problem | Addressed In
+| One `Application` per cluster, written by hand | Fleet tagging step (to be added)
+| `test` and `prod` get the same rollout at the same time | Staged rollout step (to be added)
+|===
+
+== Official Documentation
+
+* link:{gitops-docs}[Red Hat OpenShift GitOps {gitops-version}, Argo CD Agent installation, deploying an application]
+
+== Alternatives Considered
+
+[cols="2,4",options="header"]
+|===
+| Approach | Notes
+| `Application` per agent namespace (this step) | Simplest. Namespace-based mapping
+| Destination-based mapping | Applications may live in any hub namespace and pick the agent by `destination.name`. Managed agents only. Needs a setting on both Principal and agent
+|===
+
+'''
+
+== Reset
+
+Delete the application on the hub. `prune: true` removes the workload with it.
+
+[.console-input]
+[source,bash]
+----
+oc delete application.argoproj.io my-demo-app -n spoke-a --context hub --ignore-not-found --wait
+oc delete namespace my-app --context spoke-a --ignore-not-found
+----
+
+The order matters: deleting the application first lets Argo CD prune the workload cleanly. The namespace delete only catches leftovers.

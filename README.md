@@ -23,3 +23,13 @@ Drafts. Nothing here has been run on a cluster yet. Check each workshop's own RE
 1. Create `<platform>-<topic>-ws/` with `README.md`, step folders and `REPEAT.md`.
 2. Add a row to the table above.
 3. Keep the lab under about an hour and runnable from the folder alone.
+
+## Read the workshops as a site
+
+```bash
+npm install
+npm run dev          # live reload at http://localhost:3000
+npx antora site.yml  # one-off build into gh-pages/ (Antora reads committed files only)
+```
+
+Each workshop folder is one Antora component, listed in `site.yml`. `AGENTS.md` holds the writing conventions.

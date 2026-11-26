@@ -1,0 +1,69 @@
+= Multi-cluster GitOps with the Argo CD Agent
+:page-layout: home
+:!sectids:
+include::_attributes.adoc[]
+
+[.text-center.strong]
+== RHACM-style delivery for a handful of clusters, without the ACM subscription
+
+Run application delivery for 3 to 6 clusters from one hub. A small team labels each cluster, writes one Helm chart or Kustomize base, and the Argo CD Agent delivers it to every matching cluster over an outbound connection. This workshop builds that setup step by step on one hub and two spokes.
+
+IMPORTANT: Draft. Commands have not been run on a cluster yet and no timings are measured. Each step page says what is validated.
+
+[.tiles.browse]
+== Browse Modules
+
+[.tile]
+.xref:00-setup.adoc[Setup]
+* xref:00-setup.adoc#prerequisites[Prerequisites]
+* xref:00-setup.adoc#export-variables[Export Variables]
+
+[.tile]
+.xref:01-hub-principal.adoc[Step 1: Hub Principal]
+* xref:01-hub-principal.adoc#enable-principal[Enable the Principal]
+* xref:01-hub-principal.adoc#lab-pki[Lab Certificates]
+
+[.tile]
+.xref:02-register-spokes.adoc[Step 2: Register Spokes]
+* xref:02-register-spokes.adoc#register-agent[Register an Agent]
+* xref:02-register-spokes.adoc#enable-agent[Enable the Agent]
+
+[.tile]
+.xref:03-first-application.adoc[Step 3: First Application]
+* xref:03-first-application.adoc#deploy[Deploy from the Hub]
+
+== How it fits together
+
+[source,text]
+----
+            hub cluster                                spoke cluster (x2)
+  +-------------------------------+            +----------------------------+
+  | Argo CD (UI, API, repo-server)|            | Argo CD (app controller,   |
+  | Principal  <------------------+-- mTLS ----+ repo-server, redis)        |
+  | resource proxy                |  gRPC :443 | Agent                      |
+  | one namespace per agent       |            | workloads                  |
+  +-------------------------------+            +----------------------------+
+----
+
+The spokes open the connection to the hub. The hub never holds credentials for a spoke API server.
+
+[cols="2,3",options="header"]
+|===
+| Part | Job
+| Principal (hub) | Accepts agent connections, mirrors applications, proxies live-resource requests
+| Agent (each spoke) | Connects out to the Principal, applies and reports applications
+| `argocd-agentctl` (workstation) | Creates the lab CA and certificates, JWT key, and registers each agent
+|===
+
+For "govern everything from one hub", use *managed* mode: the hub is the source of truth and every `Application` is created on the hub.
+
+== Environment
+
+[cols="2,3",options="header"]
+|===
+| Item | Value
+| OpenShift | {ocp-version}
+| OpenShift GitOps | {gitops-version}
+| Clusters | 1 hub, 2 spokes
+| Contexts | `{hub-context}`, `{spoke-a-context}`, `{spoke-b-context}`
+|===

@@ -1,0 +1,9 @@
+:experimental:
+:source-highlighter: highlightjs
+:title: Multi-cluster GitOps with the Argo CD Agent
+:hub-context: hub
+:spoke-a-context: spoke-a
+:spoke-b-context: spoke-b
+:gitops-version: 1.22
+:ocp-version: 4.x
+:gitops-docs: https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/
