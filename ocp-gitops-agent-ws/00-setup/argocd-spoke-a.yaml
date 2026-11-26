@@ -1,0 +1,18 @@
+# argocd-spoke-a.yaml
+# Purpose: second Argo CD instance on the hub cluster. It plays the role of spoke-a.
+# The hub's own Argo CD has its controller switched off for the Principal, so it cannot do this job.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitops-spoke-a
+---
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: gitops-spoke-a
+  namespace: gitops-spoke-a
+  labels:
+    app.kubernetes.io/part-of: gitops-agent-workshop
+spec:
+  server:
+    enabled: false

@@ -6,7 +6,7 @@ include::_attributes.adoc[]
 [.text-center.strong]
 == RHACM-style delivery for a handful of clusters, without the ACM subscription
 
-Run application delivery for 3 to 6 clusters from one hub. A small team labels each cluster, writes one Helm chart or Kustomize base, and the Argo CD Agent delivers it to every matching cluster over an outbound connection. This workshop builds that setup step by step on one hub and two spokes.
+Run application delivery for 3 to 6 clusters from one hub. A small team labels each cluster, writes one Helm chart or Kustomize base, and the Argo CD Agent delivers it to every matching cluster over an outbound connection. This workshop builds that setup step by step on one hub that doubles as a first spoke, plus one separate spoke.
 
 IMPORTANT: Draft. Commands have not been run on a cluster yet and no timings are measured. Each step page says what is validated.
 
@@ -64,6 +64,6 @@ For "govern everything from one hub", use *managed* mode: the hub is the source 
 | Item | Value
 | OpenShift | {ocp-version}
 | OpenShift GitOps | {gitops-version}
-| Clusters | 1 hub, 2 spokes
+| Clusters | 2: the hub (which also plays spoke-a) and a separate spoke-b
 | Contexts | `{hub-context}`, `{spoke-a-context}`, `{spoke-b-context}`
 |===

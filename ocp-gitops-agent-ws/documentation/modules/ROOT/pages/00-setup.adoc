@@ -16,9 +16,11 @@ NOTE: ROSA HCP is the intended test platform but is not validated yet. Check thr
 |===
 | Context | Role | Notes
 | `hub` | Hub | Runs the Principal, the UI and the repo-server. No application controller
-| `spoke-a` | Spoke | Tagged `env=test` in step 2
-| `spoke-b` | Spoke | Tagged `env=prod` in step 2
+| `spoke-a` | Spoke | The same cluster as the hub, to save a cluster. A second Argo CD instance in `gitops-spoke-a` plays the spoke. Tagged `env=test` in step 2
+| `spoke-b` | Spoke | A separate cluster. Argo CD in `openshift-gitops`. Tagged `env=prod` in step 2
 |===
+
+NOTE: Sharing the cluster saves provisioning but is less realistic. `spoke-a` reaches the Principal through the same router as everyone else, so the remote network path is not tested for it, and anything that breaks the hub cluster breaks `spoke-a` too. `spoke-b` is the real test of a remote spoke.
 
 == Option A: log in and name the contexts [[login-clusters]]
 
@@ -33,7 +35,6 @@ Put the logins in a personal `myenv.sh`. The repository ignores it, because it h
 ----
 # myenv.sh - personal, never committed
 export HUB_API_URL="https://api.<hub-domain>:6443"
-export SPOKE_A_API_URL="https://api.<spoke-a-domain>:6443"
 export SPOKE_B_API_URL="https://api.<spoke-b-domain>:6443"
 export GIT_REPO_URL="https://github.com/<org>/<fleet-repo>.git"
 
@@ -43,8 +44,11 @@ oc config delete-context spoke-b 2>/dev/null
 
 oc login "$HUB_API_URL" --username <user> --password <password>
 oc config rename-context "$(oc config current-context)" hub
-oc login "$SPOKE_A_API_URL" --username <user> --password <password>
-oc config rename-context "$(oc config current-context)" spoke-a
+# spoke-a is the hub cluster again, under a second context name
+oc config set-context spoke-a \
+  --cluster "$(oc config view --minify --context hub -o jsonpath='{.contexts[0].context.cluster}')" \
+  --user "$(oc config view --minify --context hub -o jsonpath='{.contexts[0].context.user}')"
+
 oc login "$SPOKE_B_API_URL" --username <user> --password <password>
 oc config rename-context "$(oc config current-context)" spoke-b
 ----
@@ -64,6 +68,8 @@ source myenv.sh
 oc whoami --context hub
 oc whoami --context spoke-a
 oc whoami --context spoke-b
+oc whoami --show-server --context hub
+oc whoami --show-server --context spoke-a
 ----
 
 [.console-output]
@@ -72,20 +78,24 @@ oc whoami --context spoke-b
 <your user>
 <your user>
 <your user>
+<hub API URL>
+<hub API URL>
 ----
+
+The last two lines must be identical: `spoke-a` is the hub cluster.
 ====
 
 == Option B: contexts already configured
 
-If someone gave you a kubeconfig with the three contexts, rename them to `hub`, `spoke-a` and `spoke-b` with `oc config rename-context <old> <new>` and continue.
+If someone gave you a kubeconfig, name the contexts `hub` and `spoke-b` with `oc config rename-context <old> <new>`. Create `spoke-a` as a second context for the hub cluster with the `oc config set-context spoke-a ...` command above.
 
 '''
 
-== Install the GitOps operator on all three clusters [[install-operator]]
+== Install the GitOps operator on the two clusters [[install-operator]]
 
 *What:* Apply one manifest to each cluster. It creates the operator namespace, an `OperatorGroup` and a `Subscription`.
 
-*Why:* The hub needs Argo CD for the Principal. Each spoke needs its own Argo CD, because in this model the spoke runs the application controller.
+*Why:* The hub needs Argo CD for the Principal. Each spoke needs its own Argo CD, because in this model the spoke runs the application controller. `spoke-a` shares the hub cluster, so the operator is installed once there.
 
 The channel is set to `latest`. Pin it to your tested channel when you have one.
 
@@ -93,7 +103,6 @@ The channel is set to `latest`. Pin it to your tested channel when you have one.
 [source,bash]
 ----
 oc apply -f 00-setup/gitops-operator.yaml --context hub
-oc apply -f 00-setup/gitops-operator.yaml --context spoke-a
 oc apply -f 00-setup/gitops-operator.yaml --context spoke-b
 ----
 
@@ -117,7 +126,7 @@ NAME               AGE
 openshift-gitops   2m
 ----
 
-Repeat both commands with `--context spoke-a` and `--context spoke-b`.
+Repeat both commands with `--context spoke-b`.
 ====
 
 '''
@@ -126,7 +135,7 @@ Repeat both commands with `--context spoke-a` and `--context spoke-b`.
 
 *What:* Confirm the default instance may manage cluster-scoped resources.
 
-*Why:* The Argo CD Agent requires a cluster-scoped Argo CD instance. On OpenShift GitOps an instance is cluster-scoped when its namespace is listed in the operator's `ARGOCD_CLUSTER_CONFIG_NAMESPACES` variable. The default instance in `openshift-gitops` is already listed.
+*Why:* The Argo CD Agent requires a cluster-scoped Argo CD instance. On OpenShift GitOps an instance is cluster-scoped when its namespace is listed in the operator's `ARGOCD_CLUSTER_CONFIG_NAMESPACES` variable. The default instance in `openshift-gitops` is already listed. The second instance for `spoke-a` is not, so the next section adds it.
 
 [.console-input]
 [source,bash]
@@ -150,6 +159,46 @@ If the output is empty, the variable may be set by the operator default. Check `
 
 '''
 
+=== Create the spoke-a instance on the hub cluster
+
+*What:* Add `gitops-spoke-a` to the cluster-scoped list, then create a second Argo CD in that namespace.
+
+*Why:* The agent needs its own application controller, and the hub's Argo CD has its controller turned off in step 1. It must be cluster-scoped, so its namespace joins the operator's list.
+
+WARNING: The patch below replaces the whole `env` list of the `Subscription`. Read the current value first (previous check) and keep every entry. If your value is not just `openshift-gitops`, put it before the comma. On ROSA HCP the `Subscription` may be locked. That is not validated.
+
+[.console-input]
+[source,bash]
+----
+oc patch subscription openshift-gitops-operator -n openshift-gitops-operator --context hub \
+  --type merge -p '{"spec":{"config":{"env":[{"name":"ARGOCD_CLUSTER_CONFIG_NAMESPACES","value":"openshift-gitops,gitops-spoke-a"}]}}}'
+oc apply -f 00-setup/argocd-spoke-a.yaml --context hub
+----
+
+.Verify: the instance is running and the operator restarted with the new value
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc get argocd -n gitops-spoke-a --context spoke-a
+oc get pods -n gitops-spoke-a --context spoke-a
+----
+
+[.console-output]
+[source,bash]
+----
+NAME             AGE
+gitops-spoke-a   1m
+
+gitops-spoke-a-application-controller-0   1/1   Running
+gitops-spoke-a-redis-...                  1/1   Running
+gitops-spoke-a-repo-server-...            1/1   Running
+----
+====
+
+'''
+
 == Variables [[export-variables]]
 
 [cols="2,2,4",options="header"]
@@ -158,6 +207,7 @@ If the output is empty, the variable may be set by the operator default. Check `
 | `HUB_API_URL`, `SPOKE_A_API_URL`, `SPOKE_B_API_URL` | `myenv.sh` | API URLs of the three clusters
 | `GIT_REPO_URL` | fleet steps | Git repository that holds your application sources
 | `PRINCIPAL_DNS` | steps 1 and 2 | Route host of the Principal. Exported in step 1
+| `AGENT_ARGOCD` | step 2 | Name of the Argo CD instance on a spoke: `gitops-spoke-a` or `openshift-gitops`
 |===
 
 == Clone the repository
@@ -176,9 +226,9 @@ The setup creates only the operator. Remove it in reverse order of creation.
 [.console-input]
 [source,bash]
 ----
+oc delete -f 00-setup/argocd-spoke-a.yaml --context hub --ignore-not-found
 oc delete -f 00-setup/gitops-operator.yaml --context spoke-b --ignore-not-found
-oc delete -f 00-setup/gitops-operator.yaml --context spoke-a --ignore-not-found
 oc delete -f 00-setup/gitops-operator.yaml --context hub --ignore-not-found
 ----
 
-NOTE: Deleting the `Subscription` leaves the installed `ClusterServiceVersion` and the `openshift-gitops` namespace in place. Delete the CSV with `oc delete csv -n openshift-gitops-operator --all --context <ctx>` if you want the operator gone.
+NOTE: The `Subscription` patch is not undone by the commands above. Set `ARGOCD_CLUSTER_CONFIG_NAMESPACES` back to `openshift-gitops` if you want the original value. Deleting the `Subscription` leaves the installed `ClusterServiceVersion` and the `openshift-gitops` namespace in place. Delete the CSV with `oc delete csv -n openshift-gitops-operator --all --context <ctx>` if you want the operator gone.

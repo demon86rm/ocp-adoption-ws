@@ -36,7 +36,7 @@ oc apply -f 03-first-application/application-managed.yaml -n spoke-a --context h
 [source,bash]
 ----
 oc get application.argoproj.io my-demo-app -n spoke-a --context hub
-oc get application.argoproj.io my-demo-app -n openshift-gitops --context spoke-a
+oc get application.argoproj.io my-demo-app -n gitops-spoke-a --context spoke-a
 oc get all -n my-app --context spoke-a
 ----
 

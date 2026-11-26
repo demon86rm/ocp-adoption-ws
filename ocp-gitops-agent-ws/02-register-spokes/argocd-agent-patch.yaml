@@ -1,6 +1,6 @@
 # argocd-agent-patch.yaml
 # Purpose: merge patch that enables the Agent in a spoke Argo CD, managed mode.
-# Contains ${PRINCIPAL_DNS}, so apply it through envsubst (see the page).
+# Contains ${PRINCIPAL_DNS} and ${AGENT_ARGOCD}, so apply it through envsubst (see the page).
 spec:
   server:
     enabled: false
@@ -15,7 +15,7 @@ spec:
       logLevel: "info"
       creds: "mtls:any"
       redis:
-        serverAddress: "openshift-gitops-redis:6379"
+        serverAddress: "${AGENT_ARGOCD}-redis:6379"
       tls:
         insecure: false
         rootCASecretName: argocd-agent-ca

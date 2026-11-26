@@ -18,7 +18,7 @@ WARNING: The `--label` option below is documented on the Red Hat page as "option
 
 == Steps to Apply
 
-Do sections 1 to 4 for `spoke-a` first, then repeat them for `spoke-b` with the values in the second row of each command.
+Each command shows `spoke-a` first and `spoke-b` second. They differ in one way: `spoke-a` is the second Argo CD on the hub cluster (namespace and instance `gitops-spoke-a`), while `spoke-b` uses the default `openshift-gitops`.
 
 [#register-agent]
 === 1. Register the agent on the hub
@@ -72,7 +72,7 @@ If `env=...` is not in the labels, add it by hand and note it for the workshop:
 [#copy-certs]
 === 2. Give each spoke the CA and a client certificate
 
-*What:* Two secrets in the spoke's `openshift-gitops` namespace: `argocd-agent-ca` and `argocd-agent-client-tls`.
+*What:* Two secrets in the spoke's Argo CD namespace: `argocd-agent-ca` and `argocd-agent-client-tls`.
 
 *Why:* The agent verifies the Principal with the CA and proves its own identity with the client certificate.
 
@@ -81,10 +81,10 @@ If `env=...` is not in the labels, add it by hand and note it for the workshop:
 ----
 argocd-agentctl pki propagate \
   --principal-context hub --principal-namespace openshift-gitops \
-  --agent-context spoke-a --agent-namespace openshift-gitops
+  --agent-context spoke-a --agent-namespace gitops-spoke-a
 argocd-agentctl pki issue agent spoke-a \
   --principal-context hub --principal-namespace openshift-gitops \
-  --agent-context spoke-a --agent-namespace openshift-gitops
+  --agent-context spoke-a --agent-namespace gitops-spoke-a
 
 argocd-agentctl pki propagate \
   --principal-context hub --principal-namespace openshift-gitops \
@@ -100,8 +100,8 @@ argocd-agentctl pki issue agent spoke-b \
 [.console-input]
 [source,bash]
 ----
-oc get secrets -n openshift-gitops --context spoke-a | grep agent
-oc get secret argocd-agent-client-tls -n openshift-gitops --context spoke-a \
+oc get secrets -n gitops-spoke-a --context spoke-a | grep agent
+oc get secret argocd-agent-client-tls -n gitops-spoke-a --context spoke-a \
   -o jsonpath='{.data.tls\.crt}' | base64 --decode | openssl x509 -noout -subject -enddate
 ----
 
@@ -114,7 +114,7 @@ subject=CN=spoke-a
 notAfter=...
 ----
 
-Repeat with `--context spoke-b`. The subject must be `CN=spoke-b`.
+Repeat with `--context spoke-b` and `-n openshift-gitops`. The subject must be `CN=spoke-b`.
 ====
 
 NOTE: Which key name the agent reads for its CA (`tls.crt` or `ca.crt`) is not stated on the Red Hat page. `pki propagate` sets what the tool expects, so use it as is. If the agent later logs that it cannot load the CA, check this first.
@@ -130,18 +130,18 @@ icon:clock[] timing not measured yet
 
 *Why:* The spoke keeps the application controller, repo-server and Redis. Users work in the hub UI, so the spoke server is not needed.
 
-The patch file holds the placeholder `PRINCIPAL_DNS`, so `envsubst` fills it in. A plain `oc patch --patch-file` would apply the literal text.
+The patch file holds the placeholders `PRINCIPAL_DNS` and `AGENT_ARGOCD`, so `envsubst` fills them in. `PRINCIPAL_DNS` must be exported in this shell. A plain `oc patch --patch-file` would apply the literal text.
 
 [.console-input]
 [source,bash]
 ----
-oc get argocd openshift-gitops -n openshift-gitops --context spoke-a -o yaml > spoke-a-argocd.backup.yaml
-oc patch argocd openshift-gitops -n openshift-gitops --context spoke-a \
-  --type merge --patch "$(envsubst < 02-register-spokes/argocd-agent-patch.yaml)"
+oc get argocd gitops-spoke-a -n gitops-spoke-a --context spoke-a -o yaml > spoke-a-argocd.backup.yaml
+oc patch argocd gitops-spoke-a -n gitops-spoke-a --context spoke-a \
+  --type merge --patch "$(AGENT_ARGOCD=gitops-spoke-a envsubst < 02-register-spokes/argocd-agent-patch.yaml)"
 
 oc get argocd openshift-gitops -n openshift-gitops --context spoke-b -o yaml > spoke-b-argocd.backup.yaml
 oc patch argocd openshift-gitops -n openshift-gitops --context spoke-b \
-  --type merge --patch "$(envsubst < 02-register-spokes/argocd-agent-patch.yaml)"
+  --type merge --patch "$(AGENT_ARGOCD=openshift-gitops envsubst < 02-register-spokes/argocd-agent-patch.yaml)"
 ----
 
 .Verify: the agent pod runs next to the controller
@@ -150,17 +150,19 @@ oc patch argocd openshift-gitops -n openshift-gitops --context spoke-b \
 [.console-input]
 [source,bash]
 ----
-oc get pods -n openshift-gitops --context spoke-a
+oc get pods -n gitops-spoke-a --context spoke-a
 ----
 
 [.console-output]
 [source,bash]
 ----
-openshift-gitops-agent-agent-...                  1/1   Running
-openshift-gitops-application-controller-0         1/1   Running
-openshift-gitops-redis-...                        1/1   Running
-openshift-gitops-repo-server-...                  1/1   Running
+gitops-spoke-a-agent-agent-...                  1/1   Running
+gitops-spoke-a-application-controller-0         1/1   Running
+gitops-spoke-a-redis-...                        1/1   Running
+gitops-spoke-a-repo-server-...                  1/1   Running
 ----
+
+For `spoke-b` the prefix is `openshift-gitops`.
 ====
 
 NOTE: Autonomous mode (the spoke is the source of truth) uses `mode: autonomous` and needs a `default` `AppProject` in the spoke. This workshop uses managed mode on every spoke, so it is not covered here.
@@ -177,7 +179,7 @@ NOTE: Autonomous mode (the spoke is the source of truth) uses `mode: autonomous`
 [.console-input]
 [source,bash]
 ----
-oc logs deployment/openshift-gitops-agent-agent -n openshift-gitops --context spoke-a --tail 20
+oc logs deployment/gitops-spoke-a-agent-agent -n gitops-spoke-a --context spoke-a --tail 20
 oc logs deployment/openshift-gitops-agent-principal -n openshift-gitops --context hub --tail 10
 argocd-agentctl agent list \
   --principal-namespace openshift-gitops --principal-context hub
@@ -244,10 +246,10 @@ Undo in reverse order. Disable the agent on each spoke, remove its secrets, then
 ----
 oc patch argocd openshift-gitops -n openshift-gitops --context spoke-b --type merge \
   -p '{"spec":{"argoCDAgent":{"agent":{"enabled":false}},"server":{"enabled":true}}}'
-oc patch argocd openshift-gitops -n openshift-gitops --context spoke-a --type merge \
-  -p '{"spec":{"argoCDAgent":{"agent":{"enabled":false}},"server":{"enabled":true}}}'
+oc patch argocd gitops-spoke-a -n gitops-spoke-a --context spoke-a --type merge \
+  -p '{"spec":{"argoCDAgent":{"agent":{"enabled":false}},"server":{"enabled":false}}}'
 oc delete secret argocd-agent-client-tls argocd-agent-ca -n openshift-gitops --context spoke-b --ignore-not-found
-oc delete secret argocd-agent-client-tls argocd-agent-ca -n openshift-gitops --context spoke-a --ignore-not-found
+oc delete secret argocd-agent-client-tls argocd-agent-ca -n gitops-spoke-a --context spoke-a --ignore-not-found
 oc delete secret cluster-spoke-b cluster-spoke-a -n openshift-gitops --context hub --ignore-not-found
 ----
 
