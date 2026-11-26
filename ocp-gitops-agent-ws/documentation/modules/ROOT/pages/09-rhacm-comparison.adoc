@@ -1,0 +1,55 @@
+= Step 9 - What This Replaces and What It Does Not
+include::_attributes.adoc[]
+
+This workshop built multi-cluster application delivery for a small fleet with Argo CD, the Argo CD Agent and `ApplicationSet`. It is an alternative to one part of Red Hat Advanced Cluster Management for Kubernetes (RHACM), not to all of it. This page says which part, so you can tell when a small fleet outgrows it.
+
+NOTE: This page compares from product documentation and from what the workshop ran. The workshop did not run RHACM. Check the current RHACM documentation and your entitlements before you decide.
+
+== What you built, and what it covers
+
+[cols="2,3,2",options="header"]
+|===
+| Need | Built here | Tested
+| Deliver an application to many clusters from one place | `ApplicationSet` on the hub, agents on the spokes | Steps 3 and 4
+| Choose clusters by tag | Labels on the cluster secrets, cluster generator | Step 4
+| Different settings per environment | Helm values file or Kustomize overlay chosen by the tag | Step 4
+| Staged rollout with a gate | `RollingSync` (alpha) | Step 5
+| Limit who deploys where | `AppProject` per environment | Step 6
+| Secrets that stay out of Git | External Secrets Operator on each spoke | Step 7
+| Production-grade certificates | cert-manager | Step 8
+| No hub credentials for spoke API servers | Spokes connect out to the Principal | Steps 1 and 2
+|===
+
+== What it does not cover
+
+[cols="2,4",options="header"]
+|===
+| Capability | Where it lives
+| Create, upgrade and destroy clusters | RHACM cluster lifecycle management. Here you create clusters yourself
+| Fleet-wide policy and compliance reporting | RHACM governance policies. Here only `AppProject` limits and what you build yourself
+| One view of health and metrics for all clusters | RHACM observability. Here the Argo CD UI shows application state only
+| Multi-cluster console and search | RHACM console. Here the hub UI shows Argo CD objects only
+| Cross-cluster networking | Separate tooling. Not part of this setup
+|===
+
+== When to outgrow it
+
+* You have more clusters than you can tag and think about by hand. The workshop targets roughly 3 to 6.
+* You must prove the same configuration or policy on every cluster, with a report.
+* You create and retire clusters often and want that automated too.
+* You need one place for metrics and alerts across clusters.
+
+RHACM can also drive Argo CD `ApplicationSet`s with its own placement, so moving up later does not have to throw away what you built. Check the documentation for how.
+
+== Things to confirm before you rely on this
+
+* Support status of the Argo CD Agent in your OpenShift GitOps version. The Red Hat page this workshop follows does not state it.
+* `RollingSync` is alpha and behind a flag.
+* The `argocd-agentctl` PKI commands are for development and testing only (step 8 replaces them).
+* The agent and Principal versions can differ. The test clusters ran a Principal and agents reporting 0.10.0 with a 0.11.0 command-line tool.
+* Everything ran once, on two ROSA HCP clusters in one AWS account. Nothing here is a load or failure-mode test.
+
+== Official Documentation
+
+* link:https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/[Red Hat Advanced Cluster Management for Kubernetes documentation]
+* link:{gitops-docs}[Red Hat OpenShift GitOps {gitops-version} documentation]

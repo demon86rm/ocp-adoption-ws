@@ -1,77 +1,35 @@
-# Repeat sheet
+# Repeat sheet: add a spoke, troubleshoot, tear down
 
-Use this page to add another spoke, to troubleshoot, and before you go to production. Details live in the step folders.
+Short reference for people who have already done the workshop. The workshop pages are the source of truth. This file lists what went wrong during testing on two ROSA HCP clusters and how it showed up.
 
 ## Add another spoke
 
-Set a new `AGENT_NAME`, `AGENT_CONTEXT` and `AGENT_NS`, then:
-
-1. Hub: `oc create namespace "${AGENT_NAME}"`, add it to `spec.sourceNamespaces` of the hub `ArgoCD` and to your `AppProject` `sourceNamespaces`. Restart the Argo CD pods after an `AppProject` change.
-2. Hub: create the `Certificate` `${AGENT_NAME}-agent`, then `argocd-agentctl agent create "${AGENT_NAME}" ...` ([step 03](03-spoke-agent/README.md) section 1).
-3. Copy the CA certificate and the client certificate to the spoke with the two `jq` pipes (section 2).
-4. Spoke: enable `spec.argoCDAgent.agent` in the spoke `ArgoCD` with the same `principalServerAddress` (section 3).
-5. `argocd-agentctl agent list` shows the new agent connected.
-
-The Principal, its certificates and the JWT key are shared. Nothing in step 02 repeats except the namespace and `sourceNamespaces` entry.
+Follow the bootstrap checklist in `documentation/modules/ROOT/pages/07-secrets-bootstrap.adoc` (section "Bootstrap checklist for a new spoke"). It was assembled from steps that were each run, but not run as a whole on a third cluster.
 
 ## Troubleshooting
 
-| Symptom | Likely cause | Check |
+| Symptom | Cause | Fix |
 | --- | --- | --- |
-| Principal pod stays `0/1` | One of the four secrets is missing | `oc get secrets -n "${PRINCIPAL_NS}" \| grep agent`, then restart the Principal |
-| Agent cannot connect | Wrong `principalServerAddress` or route host, hub not reachable or not resolvable from the spoke, missing secrets on the spoke | Compare with `oc get route openshift-gitops-agent-principal`; test from the spoke network |
-| `x509: certificate is valid for …, not <route host>` in the agent log | Principal certificate was issued for a different DNS name, or `insecureGenerate: true` | Add the route host to `dnsNames` of the `argocd-agent-principal-tls` `Certificate` and let cert-manager reissue, and set `insecureGenerate: false`. `tlsClientInSecure=true` on the agent also hides it. Lab only. |
-| Principal accepts nothing for an agent | Agent name, hub namespace and `sourceNamespaces` entry differ | They must match exactly |
-| Agent log: `redis … i/o timeout` or `NOAUTH Authentication required` | Wrong `redis.serverAddress`, or a network policy blocks the agent from Redis | Match `<ArgoCD name>-redis:6379`. On the Helm path the default operator policy blocks it, add the Redis network policy below. |
-| Hub UI: `Resource not found in cluster` and agent log `… is forbidden` | Agent service account lacks access to the target namespace | Grant the agent's service account the rights it needs there |
+| Principal pod `CrashLoopBackOff` right after step 1 | The secrets do not exist yet | Create the certificates and JWT key. It recovers by itself in about a minute |
+| `ERR_BAD_SSL_CLIENT_AUTH_CERT` opening the Principal route in a browser | The Principal requires a client certificate | Expected. Open the `openshift-gitops-server` route for the UI |
+| `argocd-agentctl pki issue agent` says principal and agent cannot share a context | The tool refuses it | Add `--same-context` (only on `pki issue agent`) |
+| Application stays `Unknown`, "project ... does not exist" | The project was never sent to that spoke, or does not list that cluster as a destination | Add the cluster as a destination in the `AppProject` |
+| Sync fails with `forbidden` in the target namespace | `argocd.argoproj.io/managed-by` names the wrong Argo CD instance | Use the spoke's own instance name. Delete the namespace so it is recreated with the right label |
+| `ApplicationSet` apps sit in `openshift-gitops` with no status | Namespace-based mapping ignores the template namespace | Use destination-based mapping on the Principal and every agent |
+| `clustersecretstores.external-secrets.io is forbidden` on sync | Argo CD does not know API groups added by a later operator | Grant the controller a `ClusterRole` for that group (step 7) |
+| Route returns 503 after a Kustomize `namePrefix` | Kustomize does not rewrite the Service name inside a `Route` | Do not prefix names |
+| Sample pod crash-loops with `could not bind to address 0.0.0.0:80` | Image binds port 80 under the restricted SCC | Use an image that listens on 8080 |
+| Unexpected AWS load balancer appears | A chart set `service.type: LoadBalancer` | Use `ClusterIP` plus a `Route` |
+| Spoke agent logs `source UID annotation not found` | Benign noise about GPG keys and the `default` project | Ignore |
+| Renewed agent certificate is not used | cert-manager renews on the hub only | Copy it to the spoke again (step 8) |
 
-## Helm install path (alternative to the custom resource)
+## Tear down (order matters)
 
-The Red Hat page also installs the agent from the `redhat-argocd-agent` chart (`helm repo add openshift-helm-charts https://charts.openshift.io/`). Set `agentMode`, `server`, `namespaceOverride`, `argoCdRedisSecretName=<ArgoCD name>-redis-initial-password`, `argoCdRedisPasswordKey=admin.password` and `redisAddress`, and pass `--kube-context`. Managed mode with destination-based mapping adds `destinationBasedMapping` and `createNamespace`. Create this policy first on the spoke, in the agent namespace:
+1. Delete the `ApplicationSet`s on the hub (steps 7, 6, 5, 4), then the first application, so nothing recreates workloads.
+2. Delete the namespaces they created on each spoke.
+3. Remove the extra roles and role bindings (steps 6 and 7).
+4. Disable the Agent on each spoke, then the Principal on the hub (steps 2 and 1).
+5. Remove the operators you installed (External Secrets, cert-manager, GitOps). Deleting a `Subscription` leaves its `ClusterServiceVersion`.
+6. Delete the clusters. They cost money while they run.
 
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: custom-agent-redis-network-policy
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/name: <ArgoCD name>-redis
-  ingress:
-    - ports:
-        - protocol: TCP
-          port: 6379
-      from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: redhat-argocd-agent
-  policyTypes:
-    - Ingress
-```
-
-Whether the custom resource path needs the same policy is not stated on the Red Hat page. Check on a real cluster.
-
-## Certificate lifetime and rotation
-
-| Object | Where it lives | Renewal |
-| --- | --- | --- |
-| CA (`argocd-agent-ca`) | Hub (key and certificate), spokes (certificate only) | Plan it well before expiry. All issued certificates must end before the CA does. A new CA means updating the CA secret on every spoke. |
-| Principal and resource-proxy certificates | Hub | cert-manager renews. The Principal reloads the secret without a restart. |
-| Agent client certificate | Created on the hub, copied to the spoke | cert-manager renews on the hub. **Copying to the spoke is manual** until you automate it. Keep the common name. |
-| JWT key | Hub | Separate from certificates. Rotate with `jwt create-key --upsert`. |
-
-Suggested values in this guide: `duration: 4320h` (180 days), `renewBefore: 1440h` (60 days). Alert on `Certificate` objects that are not `Ready` and on any agent certificate with less than 30 days left on a spoke.
-
-## Before production
-
-- Use a CA from your organisation's PKI, ideally a dedicated intermediate. The key stays on the hub.
-- Keep `insecureGenerate: false` on the Principal and `insecure: false` on every agent.
-- Automate the agent certificate copy to each spoke, or put it on a calendar before the end date.
-- Narrow the autonomous `AppProject` (`destinations`, `sourceRepos`, `clusterResourceWhitelist`).
-- One hub namespace per agent. Do not reuse names.
-- Decide who may create applications in agent namespaces on the hub, and restrict that by RBAC.
-- Back up the hub `ArgoCD`, the CA secret, the JWT secret and the `cluster-<agent>` secrets, or recreate them from your PKI.
-- To retire an agent, use the blocklist and manual cleanup in [03-spoke-agent](03-spoke-agent/README.md) Reset.
-- Run the upstream configuration check on your `argocd-agentctl` version (`argocd-agentctl --help`, look for `validate` or `check-config`) after every certificate change.
-- Test on the target platform (for example ROSA) before promising it.
+Each page ends with a `Reset` section for its own step.

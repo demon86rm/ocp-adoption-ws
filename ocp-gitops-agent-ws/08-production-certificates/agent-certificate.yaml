@@ -1,0 +1,16 @@
+# agent-certificate.yaml
+# Purpose: client certificate for one agent. The common name MUST be the agent name and must stay the same on renewal.
+# Contains ${AGENT_NAME}, so apply it through envsubst.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ${AGENT_NAME}-agent
+  namespace: openshift-gitops
+spec:
+  secretName: ${AGENT_NAME}-agent
+  commonName: ${AGENT_NAME}
+  usages: [client auth, digital signature, key encipherment]
+  duration: 2160h
+  renewBefore: 720h
+  privateKey: {algorithm: RSA, size: 4096}
+  issuerRef: {name: argocd-agent-ca, kind: Issuer}

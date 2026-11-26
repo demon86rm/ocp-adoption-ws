@@ -1,0 +1,25 @@
+# argocd-eso-rbac.yaml
+# Purpose: let the spoke's Argo CD application controller manage External Secrets objects.
+# Argo CD is cluster-scoped but only knows the API groups it ships with. A kind added by a later
+# operator needs an explicit grant. Contains ${ARGOCD_NS} and ${ARGOCD_NAME}, so apply it through envsubst.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argocd-external-secrets
+rules:
+  - apiGroups: ["external-secrets.io"]
+    resources: ["*"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argocd-external-secrets-${ARGOCD_NAME}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argocd-external-secrets
+subjects:
+  - kind: ServiceAccount
+    name: ${ARGOCD_NAME}-argocd-application-controller
+    namespace: ${ARGOCD_NS}

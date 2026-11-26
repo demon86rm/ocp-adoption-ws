@@ -1,0 +1,267 @@
+= Step 8 - Production Certificates: Replace the Lab Certificates with cert-manager
+include::_attributes.adoc[]
+
+The certificates from xref:01-hub-principal.adoc[step 1] and xref:02-register-spokes.adoc[step 2] come from `argocd-agentctl pki`, which Red Hat marks as development and testing only. They are marked "DO NOT USE IN PRODUCTION" and nothing renews them. This optional module hands them to cert-manager, so the Principal and agent certificates have a defined lifetime and renew on a schedule.
+
+== Prerequisites
+
+* Steps 1 and 2 finished with the lab certificates, and both agents connected.
+* `jq` and `envsubst` on your workstation.
+* `PRINCIPAL_DNS` exported (the route host from step 1).
+
+IMPORTANT: This module keeps the lab CA so that the only thing that changes is who issues and renews certificates. For production, replace the CA with a CA certificate from your own PKI first (a dedicated intermediate is best). That swap means reissuing every certificate and copying the new CA to every spoke. It was not tested here.
+
+== How It Works
+
+. cert-manager runs on the hub only. The hub's `Issuer` signs with the same CA secret `argocd-agent-ca`.
+. A `Certificate` for the Principal and one for the resource proxy write into the secrets the Principal already reads, so no Principal setting changes. The Principal reloads them without a restart.
+. One `Certificate` per agent has the agent name as common name. cert-manager renews it on the hub, but nothing copies the renewed certificate to the spoke.
+
+== Steps to Apply
+
+[#install]
+=== 1. Install cert-manager on the hub
+
+icon:clock[] ~25 seconds (measured once on ROSA HCP)
+
+*What:* Apply the operator subscription.
+
+*Why:* The operator provides the `Issuer` and `Certificate` kinds.
+
+[.console-input]
+[source,bash]
+----
+oc apply -f 08-production-certificates/cert-manager-operator.yaml --context hub
+oc wait csv/cert-manager-operator.v1.20.1 -n cert-manager-operator \
+  --for=jsonpath='{.status.phase}'=Succeeded --timeout=300s --context hub
+----
+
+.Verify: three cert-manager pods run
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc get pods -n cert-manager --context hub
+----
+
+[.console-output]
+[source,bash]
+----
+cert-manager-...             1/1   Running
+cert-manager-cainjector-...  1/1   Running
+cert-manager-webhook-...     1/1   Running
+----
+====
+
+'''
+
+[#server-certs]
+=== 2. Issue the Principal certificates
+
+icon:clock[] ~40 seconds
+
+*What:* An `Issuer` on the CA secret, and `Certificate` objects named like the existing secrets.
+
+*Why:* cert-manager takes over those secrets and reissues them. The first DNS name of the Principal certificate must equal the route host, or agents reject it.
+
+The lifetime is 2160 hours (90 days) with renewal 720 hours before expiry. These are suggested values, not values from the Red Hat page.
+
+[.console-input]
+[source,bash]
+----
+envsubst < 08-production-certificates/issuer-and-server-certificates.yaml | oc apply --context hub -f -
+----
+
+.Verify: both certificates are ready, with a new serial number and no Principal restart
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc get certificate -n openshift-gitops --context hub
+oc get pods -n openshift-gitops --context hub | grep principal
+----
+
+[.console-output]
+[source,bash]
+----
+argocd-agent-principal-tls        True   argocd-agent-principal-tls
+argocd-agent-resource-proxy-tls   True   argocd-agent-resource-proxy-tls
+
+openshift-gitops-agent-principal-...   1/1   Running   0
+----
+
+The restart count stays at `0`.
+====
+
+Check that agents accept the new server certificate by restarting one:
+
+[.console-input]
+[source,bash]
+----
+oc rollout restart deployment/openshift-gitops-agent-agent -n openshift-gitops --context spoke-b
+oc logs deployment/openshift-gitops-agent-principal -n openshift-gitops --context hub --since=2m | grep Successful
+----
+
+.Verify: the agent reconnected
+[%collapsible]
+====
+[.console-output]
+[source,bash]
+----
+... Updated connection status to 'Successful' in Cluster: 'spoke-b' mapped with Agent: 'spoke-b'
+----
+====
+
+'''
+
+[#agent-certs]
+=== 3. Issue an agent certificate and copy it to the spoke
+
+icon:clock[] ~1 minute
+
+*What:* A `Certificate` for `spoke-b`, copied to the spoke as `argocd-agent-client-tls`.
+
+*Why:* The agent proves its identity with this certificate. The pipes move the key from the hub to the spoke without writing it to disk, and the CA private key never leaves the hub.
+
+[.console-input]
+[source,bash]
+----
+AGENT_NAME=spoke-b envsubst < 08-production-certificates/agent-certificate.yaml | oc apply --context hub -f -
+
+export AGENT_NS=openshift-gitops
+oc get secret spoke-b-agent -n openshift-gitops --context hub -o json \
+  | jq '{apiVersion, kind, type: "kubernetes.io/tls",
+         metadata: {name: "argocd-agent-client-tls", namespace: env.AGENT_NS},
+         data: {"tls.crt": .data["tls.crt"], "tls.key": .data["tls.key"]}}' \
+  | oc apply --context spoke-b -f -
+
+oc rollout restart deployment/openshift-gitops-agent-agent -n openshift-gitops --context spoke-b
+----
+
+For `spoke-a`, use `AGENT_NAME=spoke-a`, `AGENT_NS=gitops-spoke-a` and `--context spoke-a`, and restart `deployment/gitops-spoke-a-agent-agent`. This variant was not run.
+
+.Verify: the Principal sees the new identity, without the lab marker
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc logs deployment/openshift-gitops-agent-principal -n openshift-gitops --context hub --since=2m | grep identity_value
+----
+
+[.console-output]
+[source,bash]
+----
+... agent_id=spoke-b identity_source=subject identity_value="CN=spoke-b"
+----
+
+Before this step the value read `CN=spoke-b,O=DO NOT USE IN PRODUCTION`.
+====
+
+NOTE: The `oc apply` may warn that the secret lacks the `last-applied-configuration` annotation, because the CLI created it. The warning is harmless.
+
+'''
+
+[#rotation]
+=== 4. Know what renews and what does not
+
+icon:clock[] ~20 seconds
+
+*What:* Delete an agent's certificate secret on the hub and compare serial numbers.
+
+*Why:* It reproduces a renewal. Reissue on the hub is automatic. Delivery to the spoke is not.
+
+[.console-input]
+[source,bash]
+----
+oc delete secret spoke-b-agent -n openshift-gitops --context hub
+oc get secret spoke-b-agent -n openshift-gitops --context hub -o jsonpath='{.data.tls\.crt}' \
+  | base64 --decode | openssl x509 -noout -serial -subject
+oc get secret argocd-agent-client-tls -n openshift-gitops --context spoke-b -o jsonpath='{.data.tls\.crt}' \
+  | base64 --decode | openssl x509 -noout -serial
+----
+
+.Verify: the hub has a new serial with the same common name, the spoke still has the old one
+[%collapsible]
+====
+[.console-output]
+[source,bash]
+----
+serial=61D625F762AC...      (hub, new)
+subject=CN=spoke-b
+serial=784CEC97D571...      (spoke, old)
+----
+
+The agent keeps running on the old certificate until it expires. Repeat the copy from section 3 after every renewal, or run it from a scheduled job or your secret-sync tool. This was reproduced by deleting the secret. A renewal at 30 days before expiry was not waited for.
+====
+
+[cols="2,3",options="header"]
+|===
+| Item | Renewal
+| Principal and resource-proxy certificates | Automatic. The Principal reloads them
+| Agent client certificate | Reissued on the hub. Copy to the spoke by hand or by your own automation
+| CA certificate | Not handled here. Plan its lifetime and replacement
+| JWT signing key | Not a certificate. Rotate it separately
+|===
+
+'''
+
+== Before You Go to Production
+
+* Use a CA from your own PKI, not the lab CA, and keep its private key on the hub only.
+* Automate the copy of renewed agent certificates, and alert on `Certificate` objects that are not ready.
+* The common name of an agent certificate must never change. A different name is a different agent.
+* Narrow `principal.namespace.allowedNamespaces` from `"*"` to what you need.
+* To retire an agent, upstream documents no removal command. Add its certificate fingerprint to the blocklist with `argocd-agentctl blocklist add <fingerprint>`, then delete its objects by hand.
+
+== What This Solves (Compared to Step 7)
+
+[cols="2,3",options="header"]
+|===
+| Problem from Step 7 | How This Step Solves It
+| Certificates are lab-grade and never renew | cert-manager issues and renews them
+| Certificates are marked "DO NOT USE IN PRODUCTION" | The new ones are issued by your `Issuer`
+|===
+
+== What This Does NOT Solve (Yet)
+
+[cols="2,3",options="header"]
+|===
+| Remaining Problem | Addressed In
+| Delivery of renewed agent certificates to spokes | Your own automation (section 4)
+| The CA itself is the lab CA | Replace it with your own CA
+|===
+
+== Official Documentation
+
+* link:https://docs.redhat.com/en/documentation/openshift_container_platform/[OpenShift Container Platform documentation, cert-manager Operator for Red Hat OpenShift]
+
+== Alternatives Considered
+
+[cols="2,4",options="header"]
+|===
+| Approach | Notes
+| cert-manager (this step) | Issues and renews certificates inside the cluster
+| Certificates from your PKI, loaded by hand | No extra operator, but renewal is entirely manual
+| `argocd-agentctl pki` | Quickest start. Development and testing only
+|===
+
+'''
+
+== Reset
+
+Deleting a `Certificate` does not delete its secret, so the Principal keeps serving until the certificates expire. To go back to the lab certificates, reissue them with the CLI.
+
+[.console-input]
+[source,bash]
+----
+oc delete certificate spoke-b-agent spoke-a-agent -n openshift-gitops --context hub --ignore-not-found
+oc delete -f 08-production-certificates/issuer-and-server-certificates.yaml --context hub --ignore-not-found
+argocd-agentctl pki issue principal --upsert --principal-namespace openshift-gitops --principal-context hub --dns "${PRINCIPAL_DNS}"
+argocd-agentctl pki issue resource-proxy --upsert --principal-namespace openshift-gitops --principal-context hub --dns openshift-gitops-agent-principal-resource-proxy
+oc delete -f 08-production-certificates/cert-manager-operator.yaml --context hub --ignore-not-found
+----
+
+The order matters: remove the `Certificate` objects before the operator, or nothing is left to delete them cleanly. The last command leaves the operator's `ClusterServiceVersion` behind. Delete it from `cert-manager-operator` as well if you want it gone.
