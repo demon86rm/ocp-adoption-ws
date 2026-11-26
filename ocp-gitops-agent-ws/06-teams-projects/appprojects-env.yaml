@@ -1,0 +1,39 @@
+# appprojects-env.yaml
+# Purpose: one AppProject per environment. Each project may deploy only to its own cluster,
+# only from the sample repository, and only into namespaces starting with "fleet-".
+# Namespace is the only cluster-scoped kind allowed, so CreateNamespace works and nothing else cluster-wide does.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: env-test
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: gitops-agent-workshop
+spec:
+  description: Applications for clusters tagged env=test
+  sourceRepos:
+    - https://github.com/demon86rm/ocp-gitops-fleet-sample
+  destinations:
+    - name: spoke-a
+      namespace: 'fleet-*'
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: env-prod
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: gitops-agent-workshop
+spec:
+  description: Applications for clusters tagged env=prod
+  sourceRepos:
+    - https://github.com/demon86rm/ocp-gitops-fleet-sample
+  destinations:
+    - name: spoke-b
+      namespace: 'fleet-*'
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace

@@ -1,0 +1,198 @@
+= Step 6 - Teams and Projects: Limit Who Can Deploy Where
+include::_attributes.adoc[]
+
+Until now every application used the `default` project, which allows any repository, cluster and namespace. This step adds one `AppProject` per environment. A project is the boundary: which repositories, which clusters and which namespaces an application may use.
+
+== Prerequisites
+
+* xref:04-fleet-tagging.adoc[Step 4] finished. The `fleet-kustomize` `ApplicationSet` exists.
+
+== How It Works
+
+. An `AppProject` on the hub lists allowed `sourceRepos`, `destinations` (cluster names and namespaces) and cluster-scoped kinds.
+. With destination-based mapping the Principal sends a project only to the agents named in its destinations. A project for `spoke-a` never reaches `spoke-b`. This was tested.
+. The `ApplicationSet` can choose the project from the same tag that chooses the overlay: `project: 'env-{{ index .metadata.labels "env" }}'`.
+
+TIP: Projects per environment and per team read better than one per cluster. A cluster-scoped project makes sense only when one cluster has a different owner.
+
+== Steps to Apply
+
+[#create-projects]
+=== 1. Create one project per environment
+
+icon:clock[] ~40 seconds for the projects to reach the spokes (measured once)
+
+*What:* Apply `06-teams-projects/appprojects-env.yaml`. Each project allows one cluster, one repository, namespaces starting with `fleet-`, and only `Namespace` as a cluster-scoped kind.
+
+*Why:* A mistake in one application can then only touch the cluster and namespaces its environment owns.
+
+[.console-input]
+[source,bash]
+----
+oc apply -f 06-teams-projects/appprojects-env.yaml --context hub
+----
+
+.Verify: each project reached only its own cluster
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc get appproject -A --context spoke-a
+oc get appproject -A --context spoke-b
+----
+
+[.console-output]
+[source,bash]
+----
+(spoke-a)  default, env-test
+(spoke-b)  default, env-prod
+----
+
+Because `spoke-a` shares the hub cluster, the `openshift-gitops` namespace there also lists the original `env-test` and `env-prod`. Look at the copy in `gitops-spoke-a`.
+====
+
+'''
+
+[#use-projects]
+=== 2. Make the ApplicationSet use them
+
+icon:clock[] ~45 seconds
+
+*What:* Switch the Kustomize `ApplicationSet` from `default` to `env-<tag>`.
+
+*Why:* The project now follows the tag, so a new cluster tagged `env=prod` is bound to `env-prod` automatically.
+
+[.console-input]
+[source,bash]
+----
+oc patch applicationset fleet-kustomize -n openshift-gitops --context hub --type json \
+  -p '[{"op":"replace","path":"/spec/template/spec/project","value":"env-{{ index .metadata.labels \"env\" }}"}]'
+----
+
+.Verify: the applications moved to the new projects and stay healthy
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc get application.argoproj.io -n openshift-gitops --context hub | grep fleet-kustomize
+oc get application.argoproj.io fleet-kustomize-spoke-b -n openshift-gitops --context hub -o jsonpath='{.spec.project}{"\n"}'
+----
+
+[.console-output]
+[source,bash]
+----
+fleet-kustomize-spoke-a   Synced   Healthy
+fleet-kustomize-spoke-b   Synced   Healthy
+env-prod
+----
+====
+
+'''
+
+[#boundaries]
+=== 3. Try to break the boundaries
+
+icon:clock[] ~1 minute
+
+*What:* Create three applications in `env-test` that each break one rule: the other cluster, another repository, a namespace outside `fleet-*`.
+
+*Why:* A boundary you have not tried to cross is a guess.
+
+Save each as a file or pipe it in. Only the lines that differ are shown:
+
+[.console-input]
+[source,bash]
+----
+# wrong cluster:     destination: {name: spoke-b, namespace: fleet-neg}
+# wrong repository:  repoURL: https://github.com/redhat-developer/openshift-gitops-getting-started
+# wrong namespace:   destination: {name: spoke-a, namespace: default}
+----
+
+All three used `project: env-test` and were created on the hub in `openshift-gitops`.
+
+.Verify: each application stays Unknown and nothing is deployed
+[%collapsible]
+====
+[.console-output]
+[source,bash]
+----
+wrong repository:  application repo ... is not permitted in project 'env-test'
+wrong namespace:   application destination server 'in-cluster' and namespace 'default' do not match any of the allowed destinations in project 'env-test'
+wrong cluster:     Application referencing project env-test which does not exist
+----
+
+NOTE: The wrong-cluster message is misleading. The project exists on the hub but was never sent to `spoke-b`, so the spoke reports it as missing. It is still a hard block.
+====
+
+Delete the three test applications when you are done.
+
+'''
+
+[#rbac]
+=== 4. Give people access per project (not tested here)
+
+*What:* Argo CD RBAC can grant a group rights on a single project, for example "sync applications in `env-test`".
+
+*Why:* Projects limit what an application may do. RBAC limits what a person may do.
+
+WARNING: This section was not run on the test clusters. Treat the policy below as a starting point and check it on your own login method.
+
+[source,csv]
+----
+p, role:test-deployer, applications, get,  env-test/*, allow
+p, role:test-deployer, applications, sync, env-test/*, allow
+g, <your-test-team-group>, role:test-deployer
+----
+
+Set it in the `ArgoCD` resource under `spec.rbac.policy`.
+
+'''
+
+== What This Solves (Compared to Step 5)
+
+[cols="2,3",options="header"]
+|===
+| Problem from Step 5 | How This Step Solves It
+| Any application may use any repository, cluster or namespace | A project per environment fixes all three
+| A new cluster needs a hand-edited rule | The project follows the cluster's `env` tag
+|===
+
+== What This Does NOT Solve (Yet)
+
+[cols="2,3",options="header"]
+|===
+| Remaining Problem | Addressed In
+| People can still read secrets and edit projects with enough rights | Argo CD RBAC (section 4, not tested)
+| Secrets for the applications | Secrets and bootstrap (to be added)
+|===
+
+== Official Documentation
+
+* link:{gitops-docs}[Red Hat OpenShift GitOps {gitops-version} documentation]
+
+== Alternatives Considered
+
+[cols="2,4",options="header"]
+|===
+| Approach | Notes
+| One project per environment (this step) | Short list, follows the tag
+| One project per cluster | Exact, but many near-identical objects for 3 to 6 clusters
+| One project per team | Best when different teams own different applications. Combine with the environment projects
+| Only the `default` project | Nothing is limited
+|===
+
+'''
+
+== Reset
+
+[.console-input]
+[source,bash]
+----
+oc patch applicationset fleet-kustomize -n openshift-gitops --context hub --type json \
+  -p '[{"op":"replace","path":"/spec/template/spec/project","value":"default"}]'
+oc delete -f 06-teams-projects/appprojects-env.yaml --context hub --ignore-not-found
+----
+
+The order matters: move the applications back to `default` first, or deleting their project leaves them invalid.
