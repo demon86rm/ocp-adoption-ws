@@ -52,7 +52,7 @@ oc get pod,svc,route -n openshift-gitops --context hub
 [source,bash]
 ----
 NAME                                                    READY   STATUS    RESTARTS
-pod/openshift-gitops-agent-principal-...                0/1     Running   0
+pod/openshift-gitops-agent-principal-...                0/1     CrashLoopBackOff   1
 pod/openshift-gitops-redis-...                          1/1     Running   0
 pod/openshift-gitops-repo-server-...                    1/1     Running   0
 pod/openshift-gitops-server-...                         1/1     Running   0
@@ -63,7 +63,7 @@ service/openshift-gitops-agent-principal-resource-proxy ...   9090/TCP
 route.route.openshift.io/openshift-gitops-agent-principal   ...
 ----
 
-The Principal pod is `0/1` until the secrets of section 3 exist. That is expected here.
+The Principal pod crash-loops (`CrashLoopBackOff`) until the secrets of section 3 exist. That is expected here. It recovers on its own once they exist (seen on ROSA HCP, GitOps 1.22.4).
 ====
 
 Record the route host. Agents dial it and the certificate must name it.
