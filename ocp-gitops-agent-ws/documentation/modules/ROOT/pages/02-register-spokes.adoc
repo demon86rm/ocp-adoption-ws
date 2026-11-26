@@ -79,10 +79,9 @@ If `env=...` is not in the labels, add it by hand and note it for the workshop:
 [.console-input]
 [source,bash]
 ----
-argocd-agentctl pki propagate \
-  --principal-context hub --principal-namespace openshift-gitops \
-  --agent-context spoke-a --agent-namespace gitops-spoke-a
-argocd-agentctl pki issue agent spoke-a \
+# spoke-a is on the hub cluster, so the tool needs --same-context.
+# On ROSA HCP this one command created both secrets; pki propagate rejects the flag.
+argocd-agentctl pki issue agent spoke-a --same-context \
   --principal-context hub --principal-namespace openshift-gitops \
   --agent-context spoke-a --agent-namespace gitops-spoke-a
 
@@ -108,16 +107,16 @@ oc get secret argocd-agent-client-tls -n gitops-spoke-a --context spoke-a \
 [.console-output]
 [source,bash]
 ----
-argocd-agent-ca           kubernetes.io/tls
+argocd-agent-ca           Opaque
 argocd-agent-client-tls   kubernetes.io/tls
-subject=CN=spoke-a
+subject=O=DO NOT USE IN PRODUCTION, CN=spoke-a
 notAfter=...
 ----
 
-Repeat with `--context spoke-b` and `-n openshift-gitops`. The subject must be `CN=spoke-b`.
+Seen on ROSA HCP. The CA secret holds only `ca.crt`. The certificate marks itself as not for production. Repeat with `--context spoke-b` and `-n openshift-gitops`. The subject must show `CN=spoke-b`.
 ====
 
-NOTE: Which key name the agent reads for its CA (`tls.crt` or `ca.crt`) is not stated on the Red Hat page. `pki propagate` sets what the tool expects, so use it as is. If the agent later logs that it cannot load the CA, check this first.
+NOTE: The tool stores the CA under the key `ca.crt`, and the agent connected with it. Keep that key name if you create the secret yourself.
 
 '''
 
