@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Multi-cluster GitOps with the Argo CD Agent :: OpenShift Adoption Workshops</title>
+    <link rel="canonical" href="https://demon86rm.github.io/ocp-adoption-ws/ocp-gitops-agent/02-register-spokes.html">
+    <link rel="prev" href="01-hub-principal.html">
+    <link rel="next" href="03-first-application.html">
+    <meta name="generator" content="Antora 3.0.0">
+    <link rel="stylesheet" href="../_/css/site.css">
+  </head>
+  <body class="article">
+<header class="header">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="https://developers.redhat.com" target="_blank"><img src="../_/img/RHDLogo.svg" height="40px" alt="Red Hat Developer Program"></a>
+      <a class="navbar-item" style="font-size: 24px; color: white" href="https://demon86rm.github.io/ocp-adoption-ws">OpenShift Adoption Workshops</a>
+      <button class="navbar-burger" data-target="topbar-nav">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+    <div id="topbar-nav" class="navbar-menu">
+      <div class="navbar-end">
+        <a class="navbar-item" href="https://developers.redhat.com/ebooks/" target="_blank">Books</a>
+        <a class="navbar-item" href="https://developers.redhat.com/cheatsheets/" target="_blank">Cheat Sheets</a>
+        <a class="navbar-item" href="https://developers.redhat.com/events/" target="_blank">Upcoming Events</a>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">More Tutorials</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/kubernetes-tutorial/" target="_blank">Kubernetes</a>
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/istio-tutorial/" target="_blank">Istio</a>
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/quarkus-tutorial/" target="_blank">Quarkus</a>
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/knative-tutorial/" target="_blank">Knative</a>
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/tekton-tutorial/" target="_blank">Tekton</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+</header>
+<div class="body">
+<div class="nav-container" data-component="ocp-gitops-agent" data-version="master">
+  <aside class="nav">
+    <div class="panels">
+<div class="nav-panel-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <h3 class="title"><a href="index.html"></a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+<ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="index.html">Overview</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="00-setup.html">Setup</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="00-setup.html#prerequisites">Prerequisites</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="00-setup.html#login-clusters">Log In to Clusters</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="00-setup.html#install-operator">Install OpenShift GitOps</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="00-setup.html#export-variables">Export Variables</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="01-hub-principal.html">Step 1: Hub Principal</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="01-hub-principal.html#enable-principal">Enable the Principal</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="01-hub-principal.html#agent-namespaces">Agent Namespaces</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="01-hub-principal.html#lab-pki">Lab Certificates and JWT Key</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item is-current-page" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="02-register-spokes.html">Step 2: Register Spokes</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="#register-agent">Register an Agent</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="#copy-certs">Copy Certificates</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="#enable-agent">Enable the Agent</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="#confirm">Confirm the Connection</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="03-first-application.html">Step 3: First Application</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="03-first-application.html#deploy">Deploy from the Hub</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+    </div>
+  </aside>
+</div>
+<main class="article">
+<div class="toolbar" role="navigation">
+<button class="nav-toggle"></button>
+  <a href="index.html" class="home-link"></a>
+<nav class="breadcrumbs" aria-label="breadcrumbs">
+  <ul>
+    <li><a href="index.html">Multi-cluster GitOps with the Argo CD Agent</a></li>
+    <li><a href="02-register-spokes.html">Step 2: Register Spokes</a></li>
+  </ul>
+</nav>
+  <div class="edit-this-page"><a href="https://github.com/demon86rm/ocp-adoption-ws/edit/main/ocp-gitops-agent-ws/documentation/modules/ROOT/pages/02-register-spokes.adoc">Edit this Page</a></div>
+  </div>
+  <div class="content">
+<article class="doc">
+<h1 class="page">Multi-cluster GitOps with the Argo CD Agent</h1>
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>This step registers <code>spoke-a</code> and <code>spoke-b</code> on the hub, gives each a client certificate, and enables the Agent in each spoke&#8217;s Argo CD. Each spoke gets a tag (<code>env=test</code>, <code>env=prod</code>) that step 4 uses to decide where an application goes.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_prerequisites"><a class="anchor" href="#_prerequisites"></a>Prerequisites</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p><a href="01-hub-principal.html" class="xref page">Step 1</a> finished: the Principal pod is <code>1/1 Running</code>, the namespaces <code>spoke-a</code> and <code>spoke-b</code> exist on the hub.</p>
+</li>
+<li>
+<p><code>PRINCIPAL_DNS</code> is exported in this shell (see step 1, section 1).</p>
+</li>
+</ul>
+</div>
+<div class="admonitionblock warning">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-warning" title="Warning"></i>
+</td>
+<td class="content">
+The <code>--label</code> option below is documented on the Red Hat page as "optional metadata labels for the Agent". Whether it puts the label on the Argo CD cluster secret, and which value format it expects, is not validated. Step 4 depends on it. Run the check at the end of section 1 before you go on.
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_how_it_works"><a class="anchor" href="#_how_it_works"></a>How It Works</h2>
+<div class="sectionbody">
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p><code>argocd-agentctl agent create</code> registers the agent and creates the Argo CD cluster secret <code>cluster-&lt;agent&gt;</code> on the hub.</p>
+</li>
+<li>
+<p><code>argocd-agentctl pki propagate</code> copies the CA certificate to the spoke. <code>pki issue agent</code> creates the agent&#8217;s client certificate with the agent name as common name.</p>
+</li>
+<li>
+<p>The spoke&#8217;s Argo CD gets <code>spec.argoCDAgent.agent</code>, in managed mode, pointing at the Principal route.</p>
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_steps_to_apply"><a class="anchor" href="#_steps_to_apply"></a>Steps to Apply</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Do sections 1 to 4 for <code>spoke-a</code> first, then repeat them for <code>spoke-b</code> with the values in the second row of each command.</p>
+</div>
+<div class="sect2">
+<h3 id="register-agent"><a class="anchor" href="#register-agent"></a>1. Register the agent on the hub</h3>
+<div class="paragraph">
+<p><strong>What:</strong> Create the agent record and its cluster secret, with a tag.</p>
+</div>
+<div class="paragraph">
+<p><strong>Why:</strong> The tag becomes the selector that decides which clusters receive an application in step 4. In managed mode, Argo CD reaches the spoke through the Principal&#8217;s resource proxy, never through the spoke&#8217;s API server.</p>
+</div>
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">argocd-agentctl agent create spoke-a \
+  --principal-context hub --principal-namespace openshift-gitops \
+  --resource-proxy-server openshift-gitops-agent-principal-resource-proxy:9090 \
+  --label env=test
+
+argocd-agentctl agent create spoke-b \
+  --principal-context hub --principal-namespace openshift-gitops \
+  --resource-proxy-server openshift-gitops-agent-principal-resource-proxy:9090 \
+  --label env=prod</code></pre>
+</div>
+</div>
+<details>
+<summary class="title">Verify: both agents are registered and the cluster secrets carry the label</summary>
+<div class="content">
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">argocd-agentctl agent list \
+  --principal-namespace openshift-gitops --principal-context hub
+oc get secret cluster-spoke-a cluster-spoke-b -n openshift-gitops --context hub \
+  --show-labels</code></pre>
+</div>
+</div>
+<div class="listingblock console-output">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">(agent list shows spoke-a and spoke-b, not connected yet)
+
+NAME             TYPE     ...   LABELS
+cluster-spoke-a  Opaque   ...   argocd.argoproj.io/secret-type=cluster,env=test,...
+cluster-spoke-b  Opaque   ...   argocd.argoproj.io/secret-type=cluster,env=prod,...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If <code>env=&#8230;&#8203;</code> is not in the labels, add it by hand and note it for the workshop:
+<code>oc label secret cluster-spoke-a env=test -n openshift-gitops --context hub</code>.</p>
+</div>
+</div>
+</details>
+<hr>
+</div>
+<div class="sect2">
+<h3 id="copy-certs"><a class="anchor" href="#copy-certs"></a>2. Give each spoke the CA and a client certificate</h3>
+<div class="paragraph">
+<p><strong>What:</strong> Two secrets in the spoke&#8217;s <code>openshift-gitops</code> namespace: <code>argocd-agent-ca</code> and <code>argocd-agent-client-tls</code>.</p>
+</div>
+<div class="paragraph">
+<p><strong>Why:</strong> The agent verifies the Principal with the CA and proves its own identity with the client certificate.</p>
+</div>
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">argocd-agentctl pki propagate \
+  --principal-context hub --principal-namespace openshift-gitops \
+  --agent-context spoke-a --agent-namespace openshift-gitops
+argocd-agentctl pki issue agent spoke-a \
+  --principal-context hub --principal-namespace openshift-gitops \
+  --agent-context spoke-a --agent-namespace openshift-gitops
+
+argocd-agentctl pki propagate \
+  --principal-context hub --principal-namespace openshift-gitops \
+  --agent-context spoke-b --agent-namespace openshift-gitops
+argocd-agentctl pki issue agent spoke-b \
+  --principal-context hub --principal-namespace openshift-gitops \
+  --agent-context spoke-b --agent-namespace openshift-gitops</code></pre>
+</div>
+</div>
+<details>
+<summary class="title">Verify: the spoke has the CA and a client certificate named after the agent</summary>
+<div class="content">
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get secrets -n openshift-gitops --context spoke-a | grep agent
+oc get secret argocd-agent-client-tls -n openshift-gitops --context spoke-a \
+  -o jsonpath='{.data.tls\.crt}' | base64 --decode | openssl x509 -noout -subject -enddate</code></pre>
+</div>
+</div>
+<div class="listingblock console-output">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">argocd-agent-ca           kubernetes.io/tls
+argocd-agent-client-tls   kubernetes.io/tls
+subject=CN=spoke-a
+notAfter=...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Repeat with <code>--context spoke-b</code>. The subject must be <code>CN=spoke-b</code>.</p>
+</div>
+</div>
+</details>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+Which key name the agent reads for its CA (<code>tls.crt</code> or <code>ca.crt</code>) is not stated on the Red Hat page. <code>pki propagate</code> sets what the tool expects, so use it as is. If the agent later logs that it cannot load the CA, check this first.
+</td>
+</tr>
+</table>
+</div>
+<hr>
+</div>
+<div class="sect2">
+<h3 id="enable-agent"><a class="anchor" href="#enable-agent"></a>3. Enable the Agent in each spoke&#8217;s Argo CD</h3>
+<div class="paragraph">
+<p><span class="icon"><i class="fa fa-clock"></i></span> timing not measured yet</p>
+</div>
+<div class="paragraph">
+<p><strong>What:</strong> Merge the Agent settings into the spoke <code>ArgoCD</code>, in managed mode, and turn off the spoke&#8217;s web server.</p>
+</div>
+<div class="paragraph">
+<p><strong>Why:</strong> The spoke keeps the application controller, repo-server and Redis. Users work in the hub UI, so the spoke server is not needed.</p>
+</div>
+<div class="paragraph">
+<p>The patch file holds the placeholder <code>PRINCIPAL_DNS</code>, so <code>envsubst</code> fills it in. A plain <code>oc patch --patch-file</code> would apply the literal text.</p>
+</div>
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get argocd openshift-gitops -n openshift-gitops --context spoke-a -o yaml &gt; spoke-a-argocd.backup.yaml
+oc patch argocd openshift-gitops -n openshift-gitops --context spoke-a \
+  --type merge --patch "$(envsubst &lt; 02-register-spokes/argocd-agent-patch.yaml)"
+
+oc get argocd openshift-gitops -n openshift-gitops --context spoke-b -o yaml &gt; spoke-b-argocd.backup.yaml
+oc patch argocd openshift-gitops -n openshift-gitops --context spoke-b \
+  --type merge --patch "$(envsubst &lt; 02-register-spokes/argocd-agent-patch.yaml)"</code></pre>
+</div>
+</div>
+<details>
+<summary class="title">Verify: the agent pod runs next to the controller</summary>
+<div class="content">
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get pods -n openshift-gitops --context spoke-a</code></pre>
+</div>
+</div>
+<div class="listingblock console-output">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">openshift-gitops-agent-agent-...                  1/1   Running
+openshift-gitops-application-controller-0         1/1   Running
+openshift-gitops-redis-...                        1/1   Running
+openshift-gitops-repo-server-...                  1/1   Running</code></pre>
+</div>
+</div>
+</div>
+</details>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+Autonomous mode (the spoke is the source of truth) uses <code>mode: autonomous</code> and needs a <code>default</code> <code>AppProject</code> in the spoke. This workshop uses managed mode on every spoke, so it is not covered here.
+</td>
+</tr>
+</table>
+</div>
+<hr>
+</div>
+<div class="sect2">
+<h3 id="confirm"><a class="anchor" href="#confirm"></a>4. Confirm the connection from both sides</h3>
+<div class="paragraph">
+<p><strong>What:</strong> Read the agent log, the Principal log and the agent list.</p>
+</div>
+<div class="paragraph">
+<p><strong>Why:</strong> A connected agent shows up on both ends. If one side is silent, the other log tells you why.</p>
+</div>
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc logs deployment/openshift-gitops-agent-agent -n openshift-gitops --context spoke-a --tail 20
+oc logs deployment/openshift-gitops-agent-principal -n openshift-gitops --context hub --tail 10
+argocd-agentctl agent list \
+  --principal-namespace openshift-gitops --principal-context hub</code></pre>
+</div>
+</div>
+<details>
+<summary class="title">Verify: both spokes show as connected</summary>
+<div class="content">
+<div class="listingblock console-output">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">(agent log)     Authentication successful
+(agent log)     Starting to send events to event stream
+(principal log) An agent connected to the subscription stream
+(agent list)    spoke-a  connected
+                spoke-b  connected</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Common failures: <code>x509</code> host mismatch means <code>--dns</code> in step 1 did not equal <code>PRINCIPAL_DNS</code>. An unknown or denied agent means the certificate common name differs from the agent name.</p>
+</div>
+</div>
+</details>
+<hr>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_what_this_solves_compared_to_step_1"><a class="anchor" href="#_what_this_solves_compared_to_step_1"></a>What This Solves (Compared to Step 1)</h2>
+<div class="sectionbody">
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 40%;">
+<col style="width: 60%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Problem from Step 1</th>
+<th class="tableblock halign-left valign-top">How This Step Solves It</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The Principal waits and no spoke is connected</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Each spoke dials out with its own certificate</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Spokes cannot be told apart for placement</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Each agent carries a tag on its cluster secret</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_what_this_does_not_solve_yet"><a class="anchor" href="#_what_this_does_not_solve_yet"></a>What This Does NOT Solve (Yet)</h2>
+<div class="sectionbody">
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 40%;">
+<col style="width: 60%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Remaining Problem</th>
+<th class="tableblock halign-left valign-top">Addressed In</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Nothing is deployed yet</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="03-first-application.html" class="xref page">Step 3</a></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Certificates are lab-grade and do not renew</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Production certificates module (to be added)</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_official_documentation"><a class="anchor" href="#_official_documentation"></a>Official Documentation</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p><a href="https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/">Red Hat OpenShift GitOps 1.22, Argo CD Agent installation, chapter 1</a></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_alternatives_considered"><a class="anchor" href="#_alternatives_considered"></a>Alternatives Considered</h2>
+<div class="sectionbody">
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 66.6667%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Approach</th>
+<th class="tableblock halign-left valign-top">Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Managed agents (this step)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hub is the source of truth. Fits "one team governs all clusters"</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Autonomous agents</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Spoke owns its applications and the hub only watches. Fits independent teams</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Argo CD hub with direct cluster secrets</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">No agent needed, but the hub holds credentials for every spoke API server and must reach them</p></td>
+</tr>
+</tbody>
+</table>
+<hr>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_reset"><a class="anchor" href="#_reset"></a>Reset</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Undo in reverse order. Disable the agent on each spoke, remove its secrets, then remove the registration on the hub.</p>
+</div>
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc patch argocd openshift-gitops -n openshift-gitops --context spoke-b --type merge \
+  -p '{"spec":{"argoCDAgent":{"agent":{"enabled":false}},"server":{"enabled":true}}}'
+oc patch argocd openshift-gitops -n openshift-gitops --context spoke-a --type merge \
+  -p '{"spec":{"argoCDAgent":{"agent":{"enabled":false}},"server":{"enabled":true}}}'
+oc delete secret argocd-agent-client-tls argocd-agent-ca -n openshift-gitops --context spoke-b --ignore-not-found
+oc delete secret argocd-agent-client-tls argocd-agent-ca -n openshift-gitops --context spoke-a --ignore-not-found
+oc delete secret cluster-spoke-b cluster-spoke-a -n openshift-gitops --context hub --ignore-not-found</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+Upstream documents no command that removes an agent. To stop a certificate from ever reconnecting, add its fingerprint to the blocklist with <code>argocd-agentctl blocklist add &lt;fingerprint&gt;</code> (get it with <code>openssl x509 -noout -fingerprint -sha256</code>). The agent namespace on the hub is removed with step 1&#8217;s reset.
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<nav class="pagination">
+  <span class="prev"><a href="01-hub-principal.html">Step 1: Hub Principal</a></span>
+  <span class="next"><a href="03-first-application.html">Step 3: First Application</a></span>
+</nav>
+</article>
+<aside class="toc sidebar" data-title="Contents" data-levels="2">
+  <div class="toc-menu"></div>
+</aside>
+  </div>
+</main>
+</div>
+<footer class="footer">
+  <a class="rhd-logo" href="https://developers.redhat.com" target="_blank"></div>
+</footer>
+<script src="../_/js/vendor/clipboard.js"></script>
+<script src="../_/js/site.js"></script>
+<script async src="../_/js/vendor/highlight.js"></script>
+  </body>
+</html>

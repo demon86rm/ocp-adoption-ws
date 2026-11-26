@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Multi-cluster GitOps with the Argo CD Agent :: OpenShift Adoption Workshops</title>
+    <link rel="canonical" href="https://demon86rm.github.io/ocp-adoption-ws/ocp-gitops-agent/index.html">
+    <link rel="next" href="00-setup.html">
+    <meta name="generator" content="Antora 3.0.0">
+    <link rel="stylesheet" href="../_/css/site.css">
+  </head>
+  <body class="article">
+<header class="header">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="https://developers.redhat.com" target="_blank"><img src="../_/img/RHDLogo.svg" height="40px" alt="Red Hat Developer Program"></a>
+      <a class="navbar-item" style="font-size: 24px; color: white" href="https://demon86rm.github.io/ocp-adoption-ws">OpenShift Adoption Workshops</a>
+      <button class="navbar-burger" data-target="topbar-nav">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+    <div id="topbar-nav" class="navbar-menu">
+      <div class="navbar-end">
+        <a class="navbar-item" href="https://developers.redhat.com/ebooks/" target="_blank">Books</a>
+        <a class="navbar-item" href="https://developers.redhat.com/cheatsheets/" target="_blank">Cheat Sheets</a>
+        <a class="navbar-item" href="https://developers.redhat.com/events/" target="_blank">Upcoming Events</a>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">More Tutorials</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/kubernetes-tutorial/" target="_blank">Kubernetes</a>
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/istio-tutorial/" target="_blank">Istio</a>
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/quarkus-tutorial/" target="_blank">Quarkus</a>
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/knative-tutorial/" target="_blank">Knative</a>
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/tekton-tutorial/" target="_blank">Tekton</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+</header>
+<div class="body">
+<div class="nav-container" data-component="ocp-gitops-agent" data-version="master">
+  <aside class="nav">
+    <div class="panels">
+<div class="nav-panel-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <h3 class="title"><a href="index.html"></a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+<ul class="nav-list">
+  <li class="nav-item is-current-page" data-depth="1">
+    <a class="nav-link" href="index.html">Overview</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="00-setup.html">Setup</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="00-setup.html#prerequisites">Prerequisites</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="00-setup.html#login-clusters">Log In to Clusters</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="00-setup.html#install-operator">Install OpenShift GitOps</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="00-setup.html#export-variables">Export Variables</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="01-hub-principal.html">Step 1: Hub Principal</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="01-hub-principal.html#enable-principal">Enable the Principal</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="01-hub-principal.html#agent-namespaces">Agent Namespaces</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="01-hub-principal.html#lab-pki">Lab Certificates and JWT Key</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="02-register-spokes.html">Step 2: Register Spokes</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="02-register-spokes.html#register-agent">Register an Agent</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="02-register-spokes.html#copy-certs">Copy Certificates</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="02-register-spokes.html#enable-agent">Enable the Agent</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="02-register-spokes.html#confirm">Confirm the Connection</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="03-first-application.html">Step 3: First Application</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="03-first-application.html#deploy">Deploy from the Hub</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+    </div>
+  </aside>
+</div>
+<main class="article">
+<div class="toolbar" role="navigation">
+<button class="nav-toggle"></button>
+  <a href="index.html" class="home-link is-current"></a>
+<nav class="breadcrumbs" aria-label="breadcrumbs">
+  <ul>
+    <li><a href="index.html">Multi-cluster GitOps with the Argo CD Agent</a></li>
+    <li><a href="index.html">Overview</a></li>
+  </ul>
+</nav>
+  <div class="edit-this-page"><a href="https://github.com/demon86rm/ocp-adoption-ws/edit/main/ocp-gitops-agent-ws/documentation/modules/ROOT/pages/index.adoc">Edit this Page</a></div>
+  </div>
+  <div class="content">
+<article class="doc">
+<h1 class="page">Multi-cluster GitOps with the Argo CD Agent</h1>
+<div class="sect1 text-center strong">
+<h2>RHACM-style delivery for a handful of clusters, without the ACM subscription</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Run application delivery for 3 to 6 clusters from one hub. A small team labels each cluster, writes one Helm chart or Kustomize base, and the Argo CD Agent delivers it to every matching cluster over an outbound connection. This workshop builds that setup step by step on one hub and two spokes.</p>
+</div>
+<div class="admonitionblock important">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-important" title="Important"></i>
+</td>
+<td class="content">
+Draft. Commands have not been run on a cluster yet and no timings are measured. Each step page says what is validated.
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1 tiles browse">
+<h2>Browse Modules</h2>
+<div class="sectionbody">
+<div class="ulist tile">
+<div class="title"><a href="00-setup.html" class="xref page">Setup</a></div>
+<ul>
+<li>
+<p><a href="00-setup.html#prerequisites" class="xref page">Prerequisites</a></p>
+</li>
+<li>
+<p><a href="00-setup.html#export-variables" class="xref page">Export Variables</a></p>
+</li>
+</ul>
+</div>
+<div class="ulist tile">
+<div class="title"><a href="01-hub-principal.html" class="xref page">Step 1: Hub Principal</a></div>
+<ul>
+<li>
+<p><a href="01-hub-principal.html#enable-principal" class="xref page">Enable the Principal</a></p>
+</li>
+<li>
+<p><a href="01-hub-principal.html#lab-pki" class="xref page">Lab Certificates</a></p>
+</li>
+</ul>
+</div>
+<div class="ulist tile">
+<div class="title"><a href="02-register-spokes.html" class="xref page">Step 2: Register Spokes</a></div>
+<ul>
+<li>
+<p><a href="02-register-spokes.html#register-agent" class="xref page">Register an Agent</a></p>
+</li>
+<li>
+<p><a href="02-register-spokes.html#enable-agent" class="xref page">Enable the Agent</a></p>
+</li>
+</ul>
+</div>
+<div class="ulist tile">
+<div class="title"><a href="03-first-application.html" class="xref page">Step 3: First Application</a></div>
+<ul>
+<li>
+<p><a href="03-first-application.html#deploy" class="xref page">Deploy from the Hub</a></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2>How it fits together</h2>
+<div class="sectionbody">
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-text hljs" data-lang="text">            hub cluster                                spoke cluster (x2)
+  +-------------------------------+            +----------------------------+
+  | Argo CD (UI, API, repo-server)|            | Argo CD (app controller,   |
+  | Principal  &lt;------------------+-- mTLS ----+ repo-server, redis)        |
+  | resource proxy                |  gRPC :443 | Agent                      |
+  | one namespace per agent       |            | workloads                  |
+  +-------------------------------+            +----------------------------+</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The spokes open the connection to the hub. The hub never holds credentials for a spoke API server.</p>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 40%;">
+<col style="width: 60%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Part</th>
+<th class="tableblock halign-left valign-top">Job</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Principal (hub)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Accepts agent connections, mirrors applications, proxies live-resource requests</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Agent (each spoke)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Connects out to the Principal, applies and reports applications</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>argocd-agentctl</code> (workstation)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Creates the lab CA and certificates, JWT key, and registers each agent</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>For "govern everything from one hub", use <strong>managed</strong> mode: the hub is the source of truth and every <code>Application</code> is created on the hub.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2>Environment</h2>
+<div class="sectionbody">
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 40%;">
+<col style="width: 60%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Item</th>
+<th class="tableblock halign-left valign-top">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">OpenShift</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">4.x</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">OpenShift GitOps</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1.22</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Clusters</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1 hub, 2 spokes</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Contexts</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>hub</code>, <code>spoke-a</code>, <code>spoke-b</code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<nav class="pagination">
+  <span class="next"><a href="00-setup.html">Setup</a></span>
+</nav>
+</article>
+<aside class="toc sidebar" data-title="Contents" data-levels="2">
+  <div class="toc-menu"></div>
+</aside>
+  </div>
+</main>
+</div>
+<footer class="footer">
+  <a class="rhd-logo" href="https://developers.redhat.com" target="_blank"></div>
+</footer>
+<script src="../_/js/vendor/clipboard.js"></script>
+<script src="../_/js/site.js"></script>
+<script async src="../_/js/vendor/highlight.js"></script>
+  </body>
+</html>

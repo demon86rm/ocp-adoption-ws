@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url>
+<loc>https://demon86rm.github.io/ocp-adoption-ws/ocp-gitops-agent/00-setup.html</loc>
+<lastmod>2026-11-26T10:02:26.251Z</lastmod>
+</url>
+<url>
+<loc>https://demon86rm.github.io/ocp-adoption-ws/ocp-gitops-agent/01-hub-principal.html</loc>
+<lastmod>2026-11-26T10:02:26.251Z</lastmod>
+</url>
+<url>
+<loc>https://demon86rm.github.io/ocp-adoption-ws/ocp-gitops-agent/02-register-spokes.html</loc>
+<lastmod>2026-11-26T10:02:26.251Z</lastmod>
+</url>
+<url>
+<loc>https://demon86rm.github.io/ocp-adoption-ws/ocp-gitops-agent/03-first-application.html</loc>
+<lastmod>2026-11-26T10:02:26.251Z</lastmod>
+</url>
+<url>
+<loc>https://demon86rm.github.io/ocp-adoption-ws/ocp-gitops-agent/index.html</loc>
+<lastmod>2026-11-26T10:02:26.251Z</lastmod>
+</url>
+</urlset>

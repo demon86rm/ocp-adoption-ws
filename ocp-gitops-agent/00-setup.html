@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Multi-cluster GitOps with the Argo CD Agent :: OpenShift Adoption Workshops</title>
+    <link rel="canonical" href="https://demon86rm.github.io/ocp-adoption-ws/ocp-gitops-agent/00-setup.html">
+    <link rel="prev" href="index.html">
+    <link rel="next" href="01-hub-principal.html">
+    <meta name="generator" content="Antora 3.0.0">
+    <link rel="stylesheet" href="../_/css/site.css">
+  </head>
+  <body class="article">
+<header class="header">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="https://developers.redhat.com" target="_blank"><img src="../_/img/RHDLogo.svg" height="40px" alt="Red Hat Developer Program"></a>
+      <a class="navbar-item" style="font-size: 24px; color: white" href="https://demon86rm.github.io/ocp-adoption-ws">OpenShift Adoption Workshops</a>
+      <button class="navbar-burger" data-target="topbar-nav">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+    <div id="topbar-nav" class="navbar-menu">
+      <div class="navbar-end">
+        <a class="navbar-item" href="https://developers.redhat.com/ebooks/" target="_blank">Books</a>
+        <a class="navbar-item" href="https://developers.redhat.com/cheatsheets/" target="_blank">Cheat Sheets</a>
+        <a class="navbar-item" href="https://developers.redhat.com/events/" target="_blank">Upcoming Events</a>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">More Tutorials</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/kubernetes-tutorial/" target="_blank">Kubernetes</a>
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/istio-tutorial/" target="_blank">Istio</a>
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/quarkus-tutorial/" target="_blank">Quarkus</a>
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/knative-tutorial/" target="_blank">Knative</a>
+            <a class="navbar-item" href="https://redhat-developer-demos.github.io/tekton-tutorial/" target="_blank">Tekton</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+</header>
+<div class="body">
+<div class="nav-container" data-component="ocp-gitops-agent" data-version="master">
+  <aside class="nav">
+    <div class="panels">
+<div class="nav-panel-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <h3 class="title"><a href="index.html"></a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+<ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="index.html">Overview</a>
+  </li>
+  <li class="nav-item is-current-page" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="00-setup.html">Setup</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="#prerequisites">Prerequisites</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="#login-clusters">Log In to Clusters</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="#install-operator">Install OpenShift GitOps</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="#export-variables">Export Variables</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="01-hub-principal.html">Step 1: Hub Principal</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="01-hub-principal.html#enable-principal">Enable the Principal</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="01-hub-principal.html#agent-namespaces">Agent Namespaces</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="01-hub-principal.html#lab-pki">Lab Certificates and JWT Key</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="02-register-spokes.html">Step 2: Register Spokes</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="02-register-spokes.html#register-agent">Register an Agent</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="02-register-spokes.html#copy-certs">Copy Certificates</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="02-register-spokes.html#enable-agent">Enable the Agent</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="02-register-spokes.html#confirm">Confirm the Connection</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="03-first-application.html">Step 3: First Application</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="03-first-application.html#deploy">Deploy from the Hub</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+    </div>
+  </aside>
+</div>
+<main class="article">
+<div class="toolbar" role="navigation">
+<button class="nav-toggle"></button>
+  <a href="index.html" class="home-link"></a>
+<nav class="breadcrumbs" aria-label="breadcrumbs">
+  <ul>
+    <li><a href="index.html">Multi-cluster GitOps with the Argo CD Agent</a></li>
+    <li><a href="00-setup.html">Setup</a></li>
+  </ul>
+</nav>
+  <div class="edit-this-page"><a href="https://github.com/demon86rm/ocp-adoption-ws/edit/main/ocp-gitops-agent-ws/documentation/modules/ROOT/pages/00-setup.adoc">Edit this Page</a></div>
+  </div>
+  <div class="content">
+<article class="doc">
+<h1 class="page">Multi-cluster GitOps with the Argo CD Agent</h1>
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>This page prepares one hub and two spokes. Nothing is created that the later steps depend on except the operator and the named contexts.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="prerequisites"><a class="anchor" href="#prerequisites"></a>Prerequisites</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p>Three OpenShift 4.x clusters: one hub and two spokes. Each spoke must reach the hub&#8217;s Principal route over HTTPS, and DNS for the hub route host must resolve from the spokes.</p>
+</li>
+<li>
+<p>A user that can install operators on each cluster. This workshop was designed for <code>cluster-admin</code>. See the ROSA note below if you use <code>dedicated-admin</code>.</p>
+</li>
+<li>
+<p><code>oc</code>, <code>jq</code>, <code>openssl</code>, <code>envsubst</code>, and <code>argocd-agentctl</code> on your workstation. Get <code>argocd-agentctl</code> from the link in the Additional Resources of the <a href="https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/">Red Hat OpenShift GitOps documentation</a> page <strong>Argo CD Agent installation</strong>.</p>
+</li>
+<li>
+<p>A Git repository you can push to, for the later fleet steps.</p>
+</li>
+</ul>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+ROSA HCP is the intended test platform but is not validated yet. Check three things first. Your login may be <code>dedicated-admin</code>. Managed-service rules may block edits to the default <code>ArgoCD</code> in <code>openshift-gitops</code>. The hub route must be reachable from both spokes. If the second one fails, create your own <code>ArgoCD</code> in a new namespace and use that namespace wherever this workshop says <code>openshift-gitops</code>.
+</td>
+</tr>
+</table>
+</div>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Context</th>
+<th class="tableblock halign-left valign-top">Role</th>
+<th class="tableblock halign-left valign-top">Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>hub</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Hub</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Runs the Principal, the UI and the repo-server. No application controller</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>spoke-a</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Spoke</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Tagged <code>env=test</code> in step 2</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>spoke-b</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Spoke</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Tagged <code>env=prod</code> in step 2</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect1">
+<h2 id="login-clusters"><a class="anchor" href="#login-clusters"></a>Option A: log in and name the contexts</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><strong>What:</strong> Log in to the three clusters and give each context a fixed name.</p>
+</div>
+<div class="paragraph">
+<p><strong>Why:</strong> Every command in the workshop passes <code>--context</code>, so a wrong default can never touch the wrong cluster.</p>
+</div>
+<div class="paragraph">
+<p>Put the logins in a personal <code>myenv.sh</code>. The repository ignores it, because it holds passwords.</p>
+</div>
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash"># myenv.sh - personal, never committed
+export HUB_API_URL="https://api.&lt;hub-domain&gt;:6443"
+export SPOKE_A_API_URL="https://api.&lt;spoke-a-domain&gt;:6443"
+export SPOKE_B_API_URL="https://api.&lt;spoke-b-domain&gt;:6443"
+export GIT_REPO_URL="https://github.com/&lt;org&gt;/&lt;fleet-repo&gt;.git"
+
+oc config delete-context hub 2&gt;/dev/null
+oc config delete-context spoke-a 2&gt;/dev/null
+oc config delete-context spoke-b 2&gt;/dev/null
+
+oc login "$HUB_API_URL" --username &lt;user&gt; --password &lt;password&gt;
+oc config rename-context "$(oc config current-context)" hub
+oc login "$SPOKE_A_API_URL" --username &lt;user&gt; --password &lt;password&gt;
+oc config rename-context "$(oc config current-context)" spoke-a
+oc login "$SPOKE_B_API_URL" --username &lt;user&gt; --password &lt;password&gt;
+oc config rename-context "$(oc config current-context)" spoke-b</code></pre>
+</div>
+</div>
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">source myenv.sh</code></pre>
+</div>
+</div>
+<details>
+<summary class="title">Verify: three contexts exist and answer</summary>
+<div class="content">
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc whoami --context hub
+oc whoami --context spoke-a
+oc whoami --context spoke-b</code></pre>
+</div>
+</div>
+<div class="listingblock console-output">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">&lt;your user&gt;
+&lt;your user&gt;
+&lt;your user&gt;</code></pre>
+</div>
+</div>
+</div>
+</details>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_option_b_contexts_already_configured"><a class="anchor" href="#_option_b_contexts_already_configured"></a>Option B: contexts already configured</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>If someone gave you a kubeconfig with the three contexts, rename them to <code>hub</code>, <code>spoke-a</code> and <code>spoke-b</code> with <code>oc config rename-context &lt;old&gt; &lt;new&gt;</code> and continue.</p>
+</div>
+<hr>
+</div>
+</div>
+<div class="sect1">
+<h2 id="install-operator"><a class="anchor" href="#install-operator"></a>Install the GitOps operator on all three clusters</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><strong>What:</strong> Apply one manifest to each cluster. It creates the operator namespace, an <code>OperatorGroup</code> and a <code>Subscription</code>.</p>
+</div>
+<div class="paragraph">
+<p><strong>Why:</strong> The hub needs Argo CD for the Principal. Each spoke needs its own Argo CD, because in this model the spoke runs the application controller.</p>
+</div>
+<div class="paragraph">
+<p>The channel is set to <code>latest</code>. Pin it to your tested channel when you have one.</p>
+</div>
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc apply -f 00-setup/gitops-operator.yaml --context hub
+oc apply -f 00-setup/gitops-operator.yaml --context spoke-a
+oc apply -f 00-setup/gitops-operator.yaml --context spoke-b</code></pre>
+</div>
+</div>
+<details>
+<summary class="title">Verify: the operator is Succeeded and a default Argo CD exists on each cluster</summary>
+<div class="content">
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get csv -n openshift-gitops-operator --context hub
+oc get argocd -n openshift-gitops --context hub</code></pre>
+</div>
+</div>
+<div class="listingblock console-output">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">NAME                                  DISPLAY                       VERSION   PHASE
+openshift-gitops-operator.v1.22.x     Red Hat OpenShift GitOps      1.22.x    Succeeded
+
+NAME               AGE
+openshift-gitops   2m</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Repeat both commands with <code>--context spoke-a</code> and <code>--context spoke-b</code>.</p>
+</div>
+</div>
+</details>
+<hr>
+<div class="sect2">
+<h3 id="_check_the_cluster_scope"><a class="anchor" href="#_check_the_cluster_scope"></a>Check the cluster scope</h3>
+<div class="paragraph">
+<p><strong>What:</strong> Confirm the default instance may manage cluster-scoped resources.</p>
+</div>
+<div class="paragraph">
+<p><strong>Why:</strong> The Argo CD Agent requires a cluster-scoped Argo CD instance. On OpenShift GitOps an instance is cluster-scoped when its namespace is listed in the operator&#8217;s <code>ARGOCD_CLUSTER_CONFIG_NAMESPACES</code> variable. The default instance in <code>openshift-gitops</code> is already listed.</p>
+</div>
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get subscription openshift-gitops-operator \
+  -n openshift-gitops-operator --context hub \
+  -o jsonpath='{.spec.config.env}{"\n"}'</code></pre>
+</div>
+</div>
+<details>
+<summary class="title">Verify: the variable includes openshift-gitops</summary>
+<div class="content">
+<div class="listingblock console-output">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">[{"name":"ARGOCD_CLUSTER_CONFIG_NAMESPACES","value":"openshift-gitops"}]</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If the output is empty, the variable may be set by the operator default. Check <code>oc get deployment -n openshift-gitops-operator --context hub -o yaml | grep ARGOCD_CLUSTER_CONFIG_NAMESPACES</code>. If it is missing, follow <strong>cluster-scoped Argo CD instance</strong> in the Red Hat page.</p>
+</div>
+</div>
+</details>
+<hr>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="export-variables"><a class="anchor" href="#export-variables"></a>Variables</h2>
+<div class="sectionbody">
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Variable</th>
+<th class="tableblock halign-left valign-top">Used in</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>HUB_API_URL</code>, <code>SPOKE_A_API_URL</code>, <code>SPOKE_B_API_URL</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>myenv.sh</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">API URLs of the three clusters</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>GIT_REPO_URL</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fleet steps</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Git repository that holds your application sources</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>PRINCIPAL_DNS</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">steps 1 and 2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Route host of the Principal. Exported in step 1</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_clone_the_repository"><a class="anchor" href="#_clone_the_repository"></a>Clone the repository</h2>
+<div class="sectionbody">
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">git clone https://github.com/&lt;org&gt;/ocp-adoption-ws.git
+cd ocp-adoption-ws/ocp-gitops-agent-ws</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_reset"><a class="anchor" href="#_reset"></a>Reset</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The setup creates only the operator. Remove it in reverse order of creation.</p>
+</div>
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc delete -f 00-setup/gitops-operator.yaml --context spoke-b --ignore-not-found
+oc delete -f 00-setup/gitops-operator.yaml --context spoke-a --ignore-not-found
+oc delete -f 00-setup/gitops-operator.yaml --context hub --ignore-not-found</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+Deleting the <code>Subscription</code> leaves the installed <code>ClusterServiceVersion</code> and the <code>openshift-gitops</code> namespace in place. Delete the CSV with <code>oc delete csv -n openshift-gitops-operator --all --context &lt;ctx&gt;</code> if you want the operator gone.
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<nav class="pagination">
+  <span class="prev"><a href="index.html">Overview</a></span>
+  <span class="next"><a href="01-hub-principal.html">Step 1: Hub Principal</a></span>
+</nav>
+</article>
+<aside class="toc sidebar" data-title="Contents" data-levels="2">
+  <div class="toc-menu"></div>
+</aside>
+  </div>
+</main>
+</div>
+<footer class="footer">
+  <a class="rhd-logo" href="https://developers.redhat.com" target="_blank"></div>
+</footer>
+<script src="../_/js/vendor/clipboard.js"></script>
+<script src="../_/js/site.js"></script>
+<script async src="../_/js/vendor/highlight.js"></script>
+  </body>
+</html>
