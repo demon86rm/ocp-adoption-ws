@@ -1,0 +1,43 @@
+# applicationset-fleet-demo.yaml
+# Purpose: one ApplicationSet on the hub that creates one Application per tagged cluster.
+# The cluster generator reads the Argo CD cluster secrets that "agent create" made (cluster-<agent>).
+# Destination-based mapping: the Applications stay in openshift-gitops and pick the agent by destination.name.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: fleet-demo
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: gitops-agent-workshop
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchExpressions:
+            - key: env
+              operator: Exists
+  template:
+    metadata:
+      name: 'fleet-demo-{{.name}}'
+      labels:
+        app.kubernetes.io/part-of: gitops-agent-workshop
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/redhat-developer/openshift-gitops-getting-started
+        targetRevision: HEAD
+        path: app
+      destination:
+        name: '{{.name}}'
+        namespace: fleet-demo
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        managedNamespaceMetadata:
+          labels:
+            argocd.argoproj.io/managed-by: '{{ index .metadata.labels "gitops-instance" }}'
+        syncOptions:
+          - CreateNamespace=true
