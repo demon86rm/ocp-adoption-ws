@@ -29,7 +29,13 @@ Drafts. Nothing here has been run on a cluster yet. Check each workshop's own RE
 ```bash
 npm install
 npm run dev          # live reload at http://localhost:3000
-npx antora site.yml  # one-off build into gh-pages/ (Antora reads committed files only)
+npx antora site.yml  # one-off build into gh-pages/
+```
+
+Antora 2.3 hangs silently on Node 26 (no output, no `gh-pages/`). Build in the pinned container instead:
+
+```bash
+podman run --rm -v "$PWD":/antora:Z docker.io/antora/antora@sha256:e2c2a3e2ae01f6dcb26ca4c6fe6bc335a06e05d23c976b5730567100d8475ed4 site.yml
 ```
 
 Each workshop folder is one Antora component, listed in `site.yml`. `AGENTS.md` holds the writing conventions.

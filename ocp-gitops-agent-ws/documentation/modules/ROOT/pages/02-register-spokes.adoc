@@ -130,7 +130,7 @@ icon:clock[] timing not measured yet
 
 *Why:* The spoke keeps the application controller, repo-server and Redis. Users work in the hub UI, so the spoke server is not needed.
 
-The patch file contains `${PRINCIPAL_DNS}`, so `envsubst` fills it in. A plain `oc patch --patch-file` would apply the literal text.
+The patch file holds the placeholder `PRINCIPAL_DNS`, so `envsubst` fills it in. A plain `oc patch --patch-file` would apply the literal text.
 
 [.console-input]
 [source,bash]
