@@ -80,9 +80,6 @@
     <a class="nav-link" href="01-hub-principal.html#enable-principal">Enable the Principal</a>
   </li>
   <li class="nav-item" data-depth="2">
-    <a class="nav-link" href="01-hub-principal.html#agent-namespaces">Agent Namespaces</a>
-  </li>
-  <li class="nav-item" data-depth="2">
     <a class="nav-link" href="01-hub-principal.html#lab-pki">Lab Certificates and JWT Key</a>
   </li>
 </ul>
@@ -111,6 +108,54 @@
 <ul class="nav-list">
   <li class="nav-item" data-depth="2">
     <a class="nav-link" href="03-first-application.html#deploy">Deploy from the Hub</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="04-fleet-tagging.html">Step 4: Fleet Tagging</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#tag-instance">Tag the Clusters</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#kustomize-set">Kustomize per Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#helm-set">Helm per Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#select-by-tag">Choose Clusters by Tag</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="05-staged-rollout.html">Step 5: Staged Rollout</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#enable">Turn on Progressive Syncs</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#create">Staged ApplicationSet</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#gate">Break a Release</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="06-teams-projects.html">Step 6: Teams and Projects</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#create-projects">Project per Environment</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#use-projects">Projects from the Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#boundaries">Try to Break the Boundaries</a>
   </li>
 </ul>
   </li>
@@ -156,7 +201,7 @@
 <p>A user that can install operators on each cluster. This workshop was designed for <code>cluster-admin</code>. See the ROSA note below if you use <code>dedicated-admin</code>.</p>
 </li>
 <li>
-<p><code>oc</code>, <code>jq</code>, <code>openssl</code>, <code>envsubst</code>, and <code>argocd-agentctl</code> on your workstation. Get <code>argocd-agentctl</code> from the link in the Additional Resources of the <a href="https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/">Red Hat OpenShift GitOps documentation</a> page <strong>Argo CD Agent installation</strong>.</p>
+<p><code>oc</code>, <code>jq</code>, <code>openssl</code>, <code>envsubst</code>, and <code>argocd-agentctl</code> on your workstation. Download <code>argocd-agentctl</code> from the releases of the upstream <code>argoproj-labs/argocd-agent</code> GitHub project, as the Red Hat OpenShift GitOps page <strong>Argo CD Agent installation</strong> points to. The workshop was drafted with release 0.11.0 (reports Argo CD 3.6.1). If a flag differs on your version, try another release and tell the maintainer.</p>
 </li>
 <li>
 <p>A Git repository you can push to, for the later fleet steps.</p>
@@ -197,15 +242,27 @@ ROSA HCP is the intended test platform but is not validated yet. Check three thi
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><code>spoke-a</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Spoke</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Tagged <code>env=test</code> in step 2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The same cluster as the hub, to save a cluster. A second Argo CD instance in <code>gitops-spoke-a</code> plays the spoke. Tagged <code>env=test</code> in step 2</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><code>spoke-b</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Spoke</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Tagged <code>env=prod</code> in step 2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A separate cluster. Argo CD in <code>openshift-gitops</code>. Tagged <code>env=prod</code> in step 2</p></td>
 </tr>
 </tbody>
 </table>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+Sharing the cluster saves provisioning but is less realistic. <code>spoke-a</code> reaches the Principal through the same router as everyone else, so the remote network path is not tested for it, and anything that breaks the hub cluster breaks <code>spoke-a</code> too. <code>spoke-b</code> is the real test of a remote spoke.
+</td>
+</tr>
+</table>
+</div>
 </div>
 </div>
 <div class="sect1">
@@ -224,7 +281,6 @@ ROSA HCP is the intended test platform but is not validated yet. Check three thi
 <div class="content">
 <pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash"># myenv.sh - personal, never committed
 export HUB_API_URL="https://api.&lt;hub-domain&gt;:6443"
-export SPOKE_A_API_URL="https://api.&lt;spoke-a-domain&gt;:6443"
 export SPOKE_B_API_URL="https://api.&lt;spoke-b-domain&gt;:6443"
 export GIT_REPO_URL="https://github.com/&lt;org&gt;/&lt;fleet-repo&gt;.git"
 
@@ -234,8 +290,11 @@ oc config delete-context spoke-b 2&gt;/dev/null
 
 oc login "$HUB_API_URL" --username &lt;user&gt; --password &lt;password&gt;
 oc config rename-context "$(oc config current-context)" hub
-oc login "$SPOKE_A_API_URL" --username &lt;user&gt; --password &lt;password&gt;
-oc config rename-context "$(oc config current-context)" spoke-a
+# spoke-a is the hub cluster again, under a second context name
+oc config set-context spoke-a \
+  --cluster "$(oc config view --minify --context hub -o jsonpath='{.contexts[0].context.cluster}')" \
+  --user "$(oc config view --minify --context hub -o jsonpath='{.contexts[0].context.user}')"
+
 oc login "$SPOKE_B_API_URL" --username &lt;user&gt; --password &lt;password&gt;
 oc config rename-context "$(oc config current-context)" spoke-b</code></pre>
 </div>
@@ -252,15 +311,22 @@ oc config rename-context "$(oc config current-context)" spoke-b</code></pre>
 <div class="content">
 <pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc whoami --context hub
 oc whoami --context spoke-a
-oc whoami --context spoke-b</code></pre>
+oc whoami --context spoke-b
+oc whoami --show-server --context hub
+oc whoami --show-server --context spoke-a</code></pre>
 </div>
 </div>
 <div class="listingblock console-output">
 <div class="content">
 <pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">&lt;your user&gt;
 &lt;your user&gt;
-&lt;your user&gt;</code></pre>
+&lt;your user&gt;
+&lt;hub API URL&gt;
+&lt;hub API URL&gt;</code></pre>
 </div>
+</div>
+<div class="paragraph">
+<p>The last two lines must be identical: <code>spoke-a</code> is the hub cluster.</p>
 </div>
 </div>
 </details>
@@ -270,19 +336,19 @@ oc whoami --context spoke-b</code></pre>
 <h2 id="_option_b_contexts_already_configured"><a class="anchor" href="#_option_b_contexts_already_configured"></a>Option B: contexts already configured</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>If someone gave you a kubeconfig with the three contexts, rename them to <code>hub</code>, <code>spoke-a</code> and <code>spoke-b</code> with <code>oc config rename-context &lt;old&gt; &lt;new&gt;</code> and continue.</p>
+<p>If someone gave you a kubeconfig, name the contexts <code>hub</code> and <code>spoke-b</code> with <code>oc config rename-context &lt;old&gt; &lt;new&gt;</code>. Create <code>spoke-a</code> as a second context for the hub cluster with the <code>oc config set-context spoke-a &#8230;&#8203;</code> command above.</p>
 </div>
 <hr>
 </div>
 </div>
 <div class="sect1">
-<h2 id="install-operator"><a class="anchor" href="#install-operator"></a>Install the GitOps operator on all three clusters</h2>
+<h2 id="install-operator"><a class="anchor" href="#install-operator"></a>Install the GitOps operator on the two clusters</h2>
 <div class="sectionbody">
 <div class="paragraph">
 <p><strong>What:</strong> Apply one manifest to each cluster. It creates the operator namespace, an <code>OperatorGroup</code> and a <code>Subscription</code>.</p>
 </div>
 <div class="paragraph">
-<p><strong>Why:</strong> The hub needs Argo CD for the Principal. Each spoke needs its own Argo CD, because in this model the spoke runs the application controller.</p>
+<p><strong>Why:</strong> The hub needs Argo CD for the Principal. Each spoke needs its own Argo CD, because in this model the spoke runs the application controller. <code>spoke-a</code> shares the hub cluster, so the operator is installed once there.</p>
 </div>
 <div class="paragraph">
 <p>The channel is set to <code>latest</code>. Pin it to your tested channel when you have one.</p>
@@ -290,7 +356,6 @@ oc whoami --context spoke-b</code></pre>
 <div class="listingblock console-input">
 <div class="content">
 <pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc apply -f 00-setup/gitops-operator.yaml --context hub
-oc apply -f 00-setup/gitops-operator.yaml --context spoke-a
 oc apply -f 00-setup/gitops-operator.yaml --context spoke-b</code></pre>
 </div>
 </div>
@@ -313,7 +378,7 @@ openshift-gitops   2m</code></pre>
 </div>
 </div>
 <div class="paragraph">
-<p>Repeat both commands with <code>--context spoke-a</code> and <code>--context spoke-b</code>.</p>
+<p>Repeat both commands with <code>--context spoke-b</code>.</p>
 </div>
 </div>
 </details>
@@ -324,13 +389,12 @@ openshift-gitops   2m</code></pre>
 <p><strong>What:</strong> Confirm the default instance may manage cluster-scoped resources.</p>
 </div>
 <div class="paragraph">
-<p><strong>Why:</strong> The Argo CD Agent requires a cluster-scoped Argo CD instance. On OpenShift GitOps an instance is cluster-scoped when its namespace is listed in the operator&#8217;s <code>ARGOCD_CLUSTER_CONFIG_NAMESPACES</code> variable. The default instance in <code>openshift-gitops</code> is already listed.</p>
+<p><strong>Why:</strong> The Argo CD Agent requires a cluster-scoped Argo CD instance. On OpenShift GitOps an instance is cluster-scoped when its namespace is listed in the operator&#8217;s <code>ARGOCD_CLUSTER_CONFIG_NAMESPACES</code> variable. The default instance in <code>openshift-gitops</code> is already listed. The second instance for <code>spoke-a</code> is not, so the next section adds it.</p>
 </div>
 <div class="listingblock console-input">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get subscription openshift-gitops-operator \
-  -n openshift-gitops-operator --context hub \
-  -o jsonpath='{.spec.config.env}{"\n"}'</code></pre>
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get deployment -n openshift-gitops-operator --context hub -o yaml \
+  | grep -A1 ARGOCD_CLUSTER_CONFIG_NAMESPACES</code></pre>
 </div>
 </div>
 <details>
@@ -338,11 +402,62 @@ openshift-gitops   2m</code></pre>
 <div class="content">
 <div class="listingblock console-output">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">[{"name":"ARGOCD_CLUSTER_CONFIG_NAMESPACES","value":"openshift-gitops"}]</code></pre>
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">          - name: ARGOCD_CLUSTER_CONFIG_NAMESPACES
+            value: openshift-gitops</code></pre>
 </div>
 </div>
 <div class="paragraph">
-<p>If the output is empty, the variable may be set by the operator default. Check <code>oc get deployment -n openshift-gitops-operator --context hub -o yaml | grep ARGOCD_CLUSTER_CONFIG_NAMESPACES</code>. If it is missing, follow <strong>cluster-scoped Argo CD instance</strong> in the Red Hat page.</p>
+<p>The value is set by the operator itself, so the <code>Subscription</code> has no <code>config</code> entry for it. If the variable is missing, follow <strong>cluster-scoped Argo CD instance</strong> in the Red Hat page.</p>
+</div>
+</div>
+</details>
+<hr>
+</div>
+<div class="sect2">
+<h3 id="_create_the_spoke_a_instance_on_the_hub_cluster"><a class="anchor" href="#_create_the_spoke_a_instance_on_the_hub_cluster"></a>Create the spoke-a instance on the hub cluster</h3>
+<div class="paragraph">
+<p><strong>What:</strong> Add <code>gitops-spoke-a</code> to the cluster-scoped list, then create a second Argo CD in that namespace.</p>
+</div>
+<div class="paragraph">
+<p><strong>Why:</strong> The agent needs its own application controller, and the hub&#8217;s Argo CD has its controller turned off in step 1. It must be cluster-scoped, so its namespace joins the operator&#8217;s list.</p>
+</div>
+<div class="admonitionblock warning">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-warning" title="Warning"></i>
+</td>
+<td class="content">
+The patch below replaces the whole <code>env</code> list of the <code>Subscription</code>. Read the current value first (previous check) and keep every entry. If your value is not just <code>openshift-gitops</code>, put it before the comma. On ROSA HCP the <code>Subscription</code> may be locked. That is not validated.
+</td>
+</tr>
+</table>
+</div>
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc patch subscription openshift-gitops-operator -n openshift-gitops-operator --context hub \
+  --type merge -p '{"spec":{"config":{"env":[{"name":"ARGOCD_CLUSTER_CONFIG_NAMESPACES","value":"openshift-gitops,gitops-spoke-a"}]}}}'
+oc apply -f 00-setup/argocd-spoke-a.yaml --context hub</code></pre>
+</div>
+</div>
+<details>
+<summary class="title">Verify: the instance is running and the operator restarted with the new value</summary>
+<div class="content">
+<div class="listingblock console-input">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get argocd -n gitops-spoke-a --context spoke-a
+oc get pods -n gitops-spoke-a --context spoke-a</code></pre>
+</div>
+</div>
+<div class="listingblock console-output">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">NAME             AGE
+gitops-spoke-a   1m
+
+gitops-spoke-a-application-controller-0   1/1   Running
+gitops-spoke-a-redis-...                  1/1   Running
+gitops-spoke-a-repo-server-...            1/1   Running</code></pre>
+</div>
 </div>
 </div>
 </details>
@@ -382,6 +497,11 @@ openshift-gitops   2m</code></pre>
 <td class="tableblock halign-left valign-top"><p class="tableblock">steps 1 and 2</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Route host of the Principal. Exported in step 1</p></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>AGENT_ARGOCD</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">step 2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the Argo CD instance on a spoke: <code>gitops-spoke-a</code> or <code>openshift-gitops</code></p></td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -405,8 +525,8 @@ cd ocp-adoption-ws/ocp-gitops-agent-ws</code></pre>
 </div>
 <div class="listingblock console-input">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc delete -f 00-setup/gitops-operator.yaml --context spoke-b --ignore-not-found
-oc delete -f 00-setup/gitops-operator.yaml --context spoke-a --ignore-not-found
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc delete -f 00-setup/argocd-spoke-a.yaml --context hub --ignore-not-found
+oc delete -f 00-setup/gitops-operator.yaml --context spoke-b --ignore-not-found
 oc delete -f 00-setup/gitops-operator.yaml --context hub --ignore-not-found</code></pre>
 </div>
 </div>
@@ -417,7 +537,7 @@ oc delete -f 00-setup/gitops-operator.yaml --context hub --ignore-not-found</cod
 <i class="fa icon-note" title="Note"></i>
 </td>
 <td class="content">
-Deleting the <code>Subscription</code> leaves the installed <code>ClusterServiceVersion</code> and the <code>openshift-gitops</code> namespace in place. Delete the CSV with <code>oc delete csv -n openshift-gitops-operator --all --context &lt;ctx&gt;</code> if you want the operator gone.
+The <code>Subscription</code> patch is not undone by the commands above. Set <code>ARGOCD_CLUSTER_CONFIG_NAMESPACES</code> back to <code>openshift-gitops</code> if you want the original value. Deleting the <code>Subscription</code> leaves the installed <code>ClusterServiceVersion</code> and the <code>openshift-gitops</code> namespace in place. Delete the CSV with <code>oc delete csv -n openshift-gitops-operator --all --context &lt;ctx&gt;</code> if you want the operator gone.
 </td>
 </tr>
 </table>

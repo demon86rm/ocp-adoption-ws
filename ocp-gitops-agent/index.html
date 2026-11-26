@@ -79,9 +79,6 @@
     <a class="nav-link" href="01-hub-principal.html#enable-principal">Enable the Principal</a>
   </li>
   <li class="nav-item" data-depth="2">
-    <a class="nav-link" href="01-hub-principal.html#agent-namespaces">Agent Namespaces</a>
-  </li>
-  <li class="nav-item" data-depth="2">
     <a class="nav-link" href="01-hub-principal.html#lab-pki">Lab Certificates and JWT Key</a>
   </li>
 </ul>
@@ -113,6 +110,54 @@
   </li>
 </ul>
   </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="04-fleet-tagging.html">Step 4: Fleet Tagging</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#tag-instance">Tag the Clusters</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#kustomize-set">Kustomize per Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#helm-set">Helm per Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#select-by-tag">Choose Clusters by Tag</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="05-staged-rollout.html">Step 5: Staged Rollout</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#enable">Turn on Progressive Syncs</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#create">Staged ApplicationSet</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#gate">Break a Release</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="06-teams-projects.html">Step 6: Teams and Projects</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#create-projects">Project per Environment</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#use-projects">Projects from the Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#boundaries">Try to Break the Boundaries</a>
+  </li>
+</ul>
+  </li>
 </ul>
   </li>
 </ul>
@@ -140,7 +185,7 @@
 <h2>RHACM-style delivery for a handful of clusters, without the ACM subscription</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>Run application delivery for 3 to 6 clusters from one hub. A small team labels each cluster, writes one Helm chart or Kustomize base, and the Argo CD Agent delivers it to every matching cluster over an outbound connection. This workshop builds that setup step by step on one hub and two spokes.</p>
+<p>Run application delivery for 3 to 6 clusters from one hub. A small team labels each cluster, writes one Helm chart or Kustomize base, and the Argo CD Agent delivers it to every matching cluster over an outbound connection. This workshop builds that setup step by step on one hub that doubles as a first spoke, plus one separate spoke.</p>
 </div>
 <div class="admonitionblock important">
 <table>
@@ -149,7 +194,7 @@
 <i class="fa icon-important" title="Important"></i>
 </td>
 <td class="content">
-Draft. Commands have not been run on a cluster yet and no timings are measured. Each step page says what is validated.
+Draft. Steps 0 to 6 (except the RBAC section of step 6) were run once on two ROSA HCP clusters (OpenShift 5.0.1, OpenShift GitOps 1.22.4, <code>argocd-agentctl</code> 0.11.0). Later steps are not written yet. Timings are single measurements.
 </td>
 </tr>
 </table>
@@ -197,6 +242,42 @@ Draft. Commands have not been run on a cluster yet and no timings are measured. 
 <ul>
 <li>
 <p><a href="03-first-application.html#deploy" class="xref page">Deploy from the Hub</a></p>
+</li>
+</ul>
+</div>
+<div class="ulist tile">
+<div class="title"><a href="04-fleet-tagging.html" class="xref page">Step 4: Fleet Tagging</a></div>
+<ul>
+<li>
+<p><a href="04-fleet-tagging.html#kustomize-set" class="xref page">Kustomize per Tag</a></p>
+</li>
+<li>
+<p><a href="04-fleet-tagging.html#helm-set" class="xref page">Helm per Tag</a></p>
+</li>
+<li>
+<p><a href="04-fleet-tagging.html#select-by-tag" class="xref page">Choose Clusters by Tag</a></p>
+</li>
+</ul>
+</div>
+<div class="ulist tile">
+<div class="title"><a href="05-staged-rollout.html" class="xref page">Step 5: Staged Rollout</a></div>
+<ul>
+<li>
+<p><a href="05-staged-rollout.html#create" class="xref page">Test Before Prod</a></p>
+</li>
+<li>
+<p><a href="05-staged-rollout.html#gate" class="xref page">Break a Release</a></p>
+</li>
+</ul>
+</div>
+<div class="ulist tile">
+<div class="title"><a href="06-teams-projects.html" class="xref page">Step 6: Teams and Projects</a></div>
+<ul>
+<li>
+<p><a href="06-teams-projects.html#create-projects" class="xref page">Project per Environment</a></p>
+</li>
+<li>
+<p><a href="06-teams-projects.html#boundaries" class="xref page">Try to Break the Boundaries</a></p>
 </li>
 </ul>
 </div>
@@ -275,7 +356,7 @@ Draft. Commands have not been run on a cluster yet and no timings are measured. 
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Clusters</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1 hub, 2 spokes</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2: the hub (which also plays spoke-a) and a separate spoke-b</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Contexts</p></td>

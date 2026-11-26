@@ -6,6 +6,7 @@
     <title>Multi-cluster GitOps with the Argo CD Agent :: OpenShift Adoption Workshops</title>
     <link rel="canonical" href="https://demon86rm.github.io/ocp-adoption-ws/ocp-gitops-agent/03-first-application.html">
     <link rel="prev" href="02-register-spokes.html">
+    <link rel="next" href="04-fleet-tagging.html">
     <meta name="generator" content="Antora 3.0.0">
     <link rel="stylesheet" href="../_/css/site.css">
   </head>
@@ -79,9 +80,6 @@
     <a class="nav-link" href="01-hub-principal.html#enable-principal">Enable the Principal</a>
   </li>
   <li class="nav-item" data-depth="2">
-    <a class="nav-link" href="01-hub-principal.html#agent-namespaces">Agent Namespaces</a>
-  </li>
-  <li class="nav-item" data-depth="2">
     <a class="nav-link" href="01-hub-principal.html#lab-pki">Lab Certificates and JWT Key</a>
   </li>
 </ul>
@@ -113,6 +111,54 @@
   </li>
 </ul>
   </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="04-fleet-tagging.html">Step 4: Fleet Tagging</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#tag-instance">Tag the Clusters</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#kustomize-set">Kustomize per Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#helm-set">Helm per Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#select-by-tag">Choose Clusters by Tag</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="05-staged-rollout.html">Step 5: Staged Rollout</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#enable">Turn on Progressive Syncs</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#create">Staged ApplicationSet</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#gate">Break a Release</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="06-teams-projects.html">Step 6: Teams and Projects</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#create-projects">Project per Environment</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#use-projects">Projects from the Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#boundaries">Try to Break the Boundaries</a>
+  </li>
+</ul>
+  </li>
 </ul>
   </li>
 </ul>
@@ -139,7 +185,7 @@
 <div id="preamble">
 <div class="sectionbody">
 <div class="paragraph">
-<p>This step creates one <code>Application</code> on the hub and watches it reach <code>spoke-a</code>. It proves the whole chain before the fleet steps add tags, Helm and Kustomize.</p>
+<p>This step creates one <code>Application</code> on the hub and watches it reach <code>spoke-a</code>. It proves the whole chain before the fleet step adds tags, Helm and Kustomize.</p>
 </div>
 </div>
 </div>
@@ -152,7 +198,7 @@
 <p><a href="02-register-spokes.html" class="xref page">Step 2</a> finished: both agents show as connected.</p>
 </li>
 <li>
-<p>The sample repository below is the Red Hat getting-started repository. It is public. Swap in your own repository when you have one.</p>
+<p>The sample application lives in the public repository <code><a href="https://github.com/demon86rm/ocp-gitops-fleet-sample" class="bare">https://github.com/demon86rm/ocp-gitops-fleet-sample</a></code>. Argo CD needs no credentials to read it. Fork it when you want to change it.</p>
 </li>
 </ul>
 </div>
@@ -162,7 +208,10 @@
 <h2 id="_how_it_works"><a class="anchor" href="#_how_it_works"></a>How It Works</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>In managed mode the Principal sends every application found in a hub namespace to the agent with the same name. <code>destination.name</code> is the agent name. Anything changed by hand on the spoke is reverted by <code>selfHeal</code>.</p>
+<p>The <code>Application</code> lives in the hub&#8217;s <code>openshift-gitops</code> namespace. <code>destination.name</code> is the agent name, and the Principal sends the application to that agent. The spoke&#8217;s own controller renders and applies it, and <code>selfHeal</code> reverts changes made by hand.</p>
+</div>
+<div class="paragraph">
+<p>The label <code>argocd.argoproj.io/managed-by</code> on the target namespace says which Argo CD instance on the <strong>spoke</strong> may manage it. On a normal spoke that is <code>openshift-gitops</code>. <code>spoke-a</code> runs its own instance called <code>gitops-spoke-a</code>, so the manifest uses that name. With the wrong value the sync fails with <code>forbidden</code>.</p>
 </div>
 </div>
 </div>
@@ -172,37 +221,42 @@
 <div class="sect2">
 <h3 id="deploy"><a class="anchor" href="#deploy"></a>1. Create the Application on the hub</h3>
 <div class="paragraph">
-<p><span class="icon"><i class="fa fa-clock"></i></span> timing not measured yet</p>
+<p><span class="icon"><i class="fa fa-clock"></i></span> ~30 seconds from apply to <code>Synced</code> and <code>Healthy</code> (measured once on ROSA HCP)</p>
 </div>
 <div class="paragraph">
-<p><strong>What:</strong> Apply <code>03-first-application/application-managed.yaml</code> in the hub namespace <code>spoke-a</code>.</p>
+<p><strong>What:</strong> Apply <code>03-first-application/application-first.yaml</code> on the hub.</p>
 </div>
 <div class="paragraph">
-<p><strong>Why:</strong> The namespace selects the agent. The <code>Application</code> object is the only thing you create. The workload appears on the spoke.</p>
+<p><strong>Why:</strong> The <code>Application</code> object is the only thing you create. The workload appears on the spoke.</p>
 </div>
 <div class="listingblock console-input">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc apply -f 03-first-application/application-managed.yaml -n spoke-a --context hub</code></pre>
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc apply -f 03-first-application/application-first.yaml --context hub</code></pre>
 </div>
 </div>
 <details>
-<summary class="title">Verify: the hub application is Synced and Healthy, a copy and the workload exist on the spoke</summary>
+<summary class="title">Verify: the application is Synced and Healthy and the workload runs on the spoke</summary>
 <div class="content">
 <div class="listingblock console-input">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get application.argoproj.io my-demo-app -n spoke-a --context hub
-oc get application.argoproj.io my-demo-app -n openshift-gitops --context spoke-a
-oc get all -n my-app --context spoke-a</code></pre>
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get application.argoproj.io hello-first -n openshift-gitops --context hub
+oc get deploy,route -n first-app --context spoke-a</code></pre>
 </div>
 </div>
 <div class="listingblock console-output">
 <div class="content">
 <pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">NAME          SYNC STATUS   HEALTH STATUS
-my-demo-app   Synced        Healthy</code></pre>
+hello-first   Synced        Healthy
+
+NAME                    READY   UP-TO-DATE   AVAILABLE
+deployment.apps/hello   1/1     1            1
+
+NAME                             HOST/PORT
+route.route.openshift.io/hello   hello-first-app.apps.&lt;cluster domain&gt;</code></pre>
 </div>
 </div>
 <div class="paragraph">
-<p>The hub UI shows the application and its live resources through the resource proxy.</p>
+<p>Open the route in a browser. The page says <code>environment: test</code>. The hub UI shows the application and its live resources through the resource proxy.</p>
 </div>
 </div>
 </details>
@@ -211,15 +265,18 @@ my-demo-app   Synced        Healthy</code></pre>
 <div class="sect2">
 <h3 id="_2_check_that_self_heal_reverts_a_manual_change"><a class="anchor" href="#_2_check_that_self_heal_reverts_a_manual_change"></a>2. Check that self-heal reverts a manual change</h3>
 <div class="paragraph">
-<p><strong>What:</strong> Delete a deployment on the spoke and watch it come back.</p>
+<p><span class="icon"><i class="fa fa-clock"></i></span> ~30 seconds</p>
+</div>
+<div class="paragraph">
+<p><strong>What:</strong> Delete the deployment on the spoke and watch it come back.</p>
 </div>
 <div class="paragraph">
 <p><strong>Why:</strong> This is the difference between managed mode and "someone installed it once". The hub copy is the source of truth.</p>
 </div>
 <div class="listingblock console-input">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc delete deployment --all -n my-app --context spoke-a
-oc get deployment -n my-app --context spoke-a --watch</code></pre>
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc delete deployment hello -n first-app --context spoke-a
+oc get deployment -n first-app --context spoke-a --watch</code></pre>
 </div>
 </div>
 <details>
@@ -227,8 +284,8 @@ oc get deployment -n my-app --context spoke-a --watch</code></pre>
 <div class="content">
 <div class="listingblock console-output">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">NAME   READY   UP-TO-DATE   AVAILABLE
-...    1/1     1            1</code></pre>
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">NAME    READY   UP-TO-DATE   AVAILABLE
+hello   1/1     1            1</code></pre>
 </div>
 </div>
 </div>
@@ -281,11 +338,11 @@ oc get deployment -n my-app --context spoke-a --watch</code></pre>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">One <code>Application</code> per cluster, written by hand</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Fleet tagging step (to be added)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="04-fleet-tagging.html" class="xref page">Step 4</a></p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><code>test</code> and <code>prod</code> get the same rollout at the same time</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Staged rollout step (to be added)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>test</code> and <code>prod</code> get the same settings</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="04-fleet-tagging.html" class="xref page">Step 4</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -319,12 +376,12 @@ oc get deployment -n my-app --context spoke-a --watch</code></pre>
 </thead>
 <tbody>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><code>Application</code> per agent namespace (this step)</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Simplest. Namespace-based mapping</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Destination-based mapping (this workshop)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Applications live in <code>openshift-gitops</code> and pick the agent by name. Works with <code>ApplicationSet</code>. Managed agents only</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Destination-based mapping</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Applications may live in any hub namespace and pick the agent by <code>destination.name</code>. Managed agents only. Needs a setting on both Principal and agent</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Namespace-based mapping</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">One hub namespace per agent. The <code>ApplicationSet</code> controller ignores the template namespace, so generated applications never reach the spoke</p></td>
 </tr>
 </tbody>
 </table>
@@ -339,8 +396,8 @@ oc get deployment -n my-app --context spoke-a --watch</code></pre>
 </div>
 <div class="listingblock console-input">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc delete application.argoproj.io my-demo-app -n spoke-a --context hub --ignore-not-found --wait
-oc delete namespace my-app --context spoke-a --ignore-not-found</code></pre>
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc delete application.argoproj.io hello-first -n openshift-gitops --context hub --ignore-not-found --wait
+oc delete namespace first-app --context spoke-a --ignore-not-found</code></pre>
 </div>
 </div>
 <div class="paragraph">
@@ -350,6 +407,7 @@ oc delete namespace my-app --context spoke-a --ignore-not-found</code></pre>
 </div>
 <nav class="pagination">
   <span class="prev"><a href="02-register-spokes.html">Step 2: Register Spokes</a></span>
+  <span class="next"><a href="04-fleet-tagging.html">Step 4: Fleet Tagging</a></span>
 </nav>
 </article>
 <aside class="toc sidebar" data-title="Contents" data-levels="2">

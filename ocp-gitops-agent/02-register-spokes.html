@@ -80,9 +80,6 @@
     <a class="nav-link" href="01-hub-principal.html#enable-principal">Enable the Principal</a>
   </li>
   <li class="nav-item" data-depth="2">
-    <a class="nav-link" href="01-hub-principal.html#agent-namespaces">Agent Namespaces</a>
-  </li>
-  <li class="nav-item" data-depth="2">
     <a class="nav-link" href="01-hub-principal.html#lab-pki">Lab Certificates and JWT Key</a>
   </li>
 </ul>
@@ -111,6 +108,54 @@
 <ul class="nav-list">
   <li class="nav-item" data-depth="2">
     <a class="nav-link" href="03-first-application.html#deploy">Deploy from the Hub</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="04-fleet-tagging.html">Step 4: Fleet Tagging</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#tag-instance">Tag the Clusters</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#kustomize-set">Kustomize per Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#helm-set">Helm per Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#select-by-tag">Choose Clusters by Tag</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="05-staged-rollout.html">Step 5: Staged Rollout</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#enable">Turn on Progressive Syncs</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#create">Staged ApplicationSet</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#gate">Break a Release</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="06-teams-projects.html">Step 6: Teams and Projects</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#create-projects">Project per Environment</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#use-projects">Projects from the Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#boundaries">Try to Break the Boundaries</a>
   </li>
 </ul>
   </li>
@@ -150,21 +195,21 @@
 <div class="ulist">
 <ul>
 <li>
-<p><a href="01-hub-principal.html" class="xref page">Step 1</a> finished: the Principal pod is <code>1/1 Running</code>, the namespaces <code>spoke-a</code> and <code>spoke-b</code> exist on the hub.</p>
+<p><a href="01-hub-principal.html" class="xref page">Step 1</a> finished: the Principal pod is <code>1/1 Running</code>.</p>
 </li>
 <li>
 <p><code>PRINCIPAL_DNS</code> is exported in this shell (see step 1, section 1).</p>
 </li>
 </ul>
 </div>
-<div class="admonitionblock warning">
+<div class="admonitionblock note">
 <table>
 <tr>
 <td class="icon">
-<i class="fa icon-warning" title="Warning"></i>
+<i class="fa icon-note" title="Note"></i>
 </td>
 <td class="content">
-The <code>--label</code> option below is documented on the Red Hat page as "optional metadata labels for the Agent". Whether it puts the label on the Argo CD cluster secret, and which value format it expects, is not validated. Step 4 depends on it. Run the check at the end of section 1 before you go on.
+<code>--label env=test</code> puts the label <code>env=test</code> on the cluster secret <code>cluster-&lt;agent&gt;</code> (tested on ROSA HCP). Step 4 selects clusters with it.
 </td>
 </tr>
 </table>
@@ -180,10 +225,10 @@ The <code>--label</code> option below is documented on the Red Hat page as "opti
 <p><code>argocd-agentctl agent create</code> registers the agent and creates the Argo CD cluster secret <code>cluster-&lt;agent&gt;</code> on the hub.</p>
 </li>
 <li>
-<p><code>argocd-agentctl pki propagate</code> copies the CA certificate to the spoke. <code>pki issue agent</code> creates the agent&#8217;s client certificate with the agent name as common name.</p>
+<p><code>argocd-agentctl pki issue agent</code> creates the agent&#8217;s client certificate with the agent name as common name, and the CA secret on the spoke. <code>pki propagate</code> also copies the CA and is shown for the separate spoke.</p>
 </li>
 <li>
-<p>The spoke&#8217;s Argo CD gets <code>spec.argoCDAgent.agent</code>, in managed mode, pointing at the Principal route.</p>
+<p>The spoke&#8217;s Argo CD gets <code>spec.argoCDAgent.agent</code>, in managed mode, with destination-based mapping on, pointing at the Principal route.</p>
 </li>
 </ol>
 </div>
@@ -193,7 +238,7 @@ The <code>--label</code> option below is documented on the Red Hat page as "opti
 <h2 id="_steps_to_apply"><a class="anchor" href="#_steps_to_apply"></a>Steps to Apply</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>Do sections 1 to 4 for <code>spoke-a</code> first, then repeat them for <code>spoke-b</code> with the values in the second row of each command.</p>
+<p>Each command shows <code>spoke-a</code> first and <code>spoke-b</code> second. They differ in one way: <code>spoke-a</code> is the second Argo CD on the hub cluster (namespace and instance <code>gitops-spoke-a</code>), while <code>spoke-b</code> uses the default <code>openshift-gitops</code>.</p>
 </div>
 <div class="sect2">
 <h3 id="register-agent"><a class="anchor" href="#register-agent"></a>1. Register the agent on the hub</h3>
@@ -247,19 +292,18 @@ cluster-spoke-b  Opaque   ...   argocd.argoproj.io/secret-type=cluster,env=prod,
 <div class="sect2">
 <h3 id="copy-certs"><a class="anchor" href="#copy-certs"></a>2. Give each spoke the CA and a client certificate</h3>
 <div class="paragraph">
-<p><strong>What:</strong> Two secrets in the spoke&#8217;s <code>openshift-gitops</code> namespace: <code>argocd-agent-ca</code> and <code>argocd-agent-client-tls</code>.</p>
+<p><strong>What:</strong> Two secrets in the spoke&#8217;s Argo CD namespace: <code>argocd-agent-ca</code> and <code>argocd-agent-client-tls</code>.</p>
 </div>
 <div class="paragraph">
 <p><strong>Why:</strong> The agent verifies the Principal with the CA and proves its own identity with the client certificate.</p>
 </div>
 <div class="listingblock console-input">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">argocd-agentctl pki propagate \
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash"># spoke-a is on the hub cluster, so the tool needs --same-context.
+# On ROSA HCP this one command created both secrets; pki propagate rejects the flag.
+argocd-agentctl pki issue agent spoke-a --same-context \
   --principal-context hub --principal-namespace openshift-gitops \
-  --agent-context spoke-a --agent-namespace openshift-gitops
-argocd-agentctl pki issue agent spoke-a \
-  --principal-context hub --principal-namespace openshift-gitops \
-  --agent-context spoke-a --agent-namespace openshift-gitops
+  --agent-context spoke-a --agent-namespace gitops-spoke-a
 
 argocd-agentctl pki propagate \
   --principal-context hub --principal-namespace openshift-gitops \
@@ -274,21 +318,21 @@ argocd-agentctl pki issue agent spoke-b \
 <div class="content">
 <div class="listingblock console-input">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get secrets -n openshift-gitops --context spoke-a | grep agent
-oc get secret argocd-agent-client-tls -n openshift-gitops --context spoke-a \
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get secrets -n gitops-spoke-a --context spoke-a | grep agent
+oc get secret argocd-agent-client-tls -n gitops-spoke-a --context spoke-a \
   -o jsonpath='{.data.tls\.crt}' | base64 --decode | openssl x509 -noout -subject -enddate</code></pre>
 </div>
 </div>
 <div class="listingblock console-output">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">argocd-agent-ca           kubernetes.io/tls
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">argocd-agent-ca           Opaque
 argocd-agent-client-tls   kubernetes.io/tls
-subject=CN=spoke-a
+subject=O=DO NOT USE IN PRODUCTION, CN=spoke-a
 notAfter=...</code></pre>
 </div>
 </div>
 <div class="paragraph">
-<p>Repeat with <code>--context spoke-b</code>. The subject must be <code>CN=spoke-b</code>.</p>
+<p>Seen on ROSA HCP. The CA secret holds only <code>ca.crt</code>. The certificate marks itself as not for production. Repeat with <code>--context spoke-b</code> and <code>-n openshift-gitops</code>. The subject must show <code>CN=spoke-b</code>.</p>
 </div>
 </div>
 </details>
@@ -299,7 +343,7 @@ notAfter=...</code></pre>
 <i class="fa icon-note" title="Note"></i>
 </td>
 <td class="content">
-Which key name the agent reads for its CA (<code>tls.crt</code> or <code>ca.crt</code>) is not stated on the Red Hat page. <code>pki propagate</code> sets what the tool expects, so use it as is. If the agent later logs that it cannot load the CA, check this first.
+The tool stores the CA under the key <code>ca.crt</code>, and the agent connected with it. Keep that key name if you create the secret yourself.
 </td>
 </tr>
 </table>
@@ -318,17 +362,17 @@ Which key name the agent reads for its CA (<code>tls.crt</code> or <code>ca.crt<
 <p><strong>Why:</strong> The spoke keeps the application controller, repo-server and Redis. Users work in the hub UI, so the spoke server is not needed.</p>
 </div>
 <div class="paragraph">
-<p>The patch file holds the placeholder <code>PRINCIPAL_DNS</code>, so <code>envsubst</code> fills it in. A plain <code>oc patch --patch-file</code> would apply the literal text.</p>
+<p>The patch file holds the placeholders <code>PRINCIPAL_DNS</code> and <code>AGENT_ARGOCD</code>, so <code>envsubst</code> fills them in. <code>PRINCIPAL_DNS</code> must be exported in this shell. A plain <code>oc patch --patch-file</code> would apply the literal text.</p>
 </div>
 <div class="listingblock console-input">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get argocd openshift-gitops -n openshift-gitops --context spoke-a -o yaml &gt; spoke-a-argocd.backup.yaml
-oc patch argocd openshift-gitops -n openshift-gitops --context spoke-a \
-  --type merge --patch "$(envsubst &lt; 02-register-spokes/argocd-agent-patch.yaml)"
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get argocd gitops-spoke-a -n gitops-spoke-a --context spoke-a -o yaml &gt; spoke-a-argocd.backup.yaml
+oc patch argocd gitops-spoke-a -n gitops-spoke-a --context spoke-a \
+  --type merge --patch "$(AGENT_ARGOCD=gitops-spoke-a envsubst &lt; 02-register-spokes/argocd-agent-patch.yaml)"
 
 oc get argocd openshift-gitops -n openshift-gitops --context spoke-b -o yaml &gt; spoke-b-argocd.backup.yaml
 oc patch argocd openshift-gitops -n openshift-gitops --context spoke-b \
-  --type merge --patch "$(envsubst &lt; 02-register-spokes/argocd-agent-patch.yaml)"</code></pre>
+  --type merge --patch "$(AGENT_ARGOCD=openshift-gitops envsubst &lt; 02-register-spokes/argocd-agent-patch.yaml)"</code></pre>
 </div>
 </div>
 <details>
@@ -336,16 +380,19 @@ oc patch argocd openshift-gitops -n openshift-gitops --context spoke-b \
 <div class="content">
 <div class="listingblock console-input">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get pods -n openshift-gitops --context spoke-a</code></pre>
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get pods -n gitops-spoke-a --context spoke-a</code></pre>
 </div>
 </div>
 <div class="listingblock console-output">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">openshift-gitops-agent-agent-...                  1/1   Running
-openshift-gitops-application-controller-0         1/1   Running
-openshift-gitops-redis-...                        1/1   Running
-openshift-gitops-repo-server-...                  1/1   Running</code></pre>
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">gitops-spoke-a-agent-agent-...                  1/1   Running
+gitops-spoke-a-application-controller-0         1/1   Running
+gitops-spoke-a-redis-...                        1/1   Running
+gitops-spoke-a-repo-server-...                  1/1   Running</code></pre>
 </div>
+</div>
+<div class="paragraph">
+<p>For <code>spoke-b</code> the prefix is <code>openshift-gitops</code>.</p>
 </div>
 </div>
 </details>
@@ -356,7 +403,7 @@ openshift-gitops-repo-server-...                  1/1   Running</code></pre>
 <i class="fa icon-note" title="Note"></i>
 </td>
 <td class="content">
-Autonomous mode (the spoke is the source of truth) uses <code>mode: autonomous</code> and needs a <code>default</code> <code>AppProject</code> in the spoke. This workshop uses managed mode on every spoke, so it is not covered here.
+Autonomous mode (the spoke is the source of truth) uses <code>mode: autonomous</code>, a <code>default</code> <code>AppProject</code> in the spoke, and a hub namespace named after the agent. This workshop uses managed mode on every spoke, so it is not covered or tested here.
 </td>
 </tr>
 </table>
@@ -373,7 +420,7 @@ Autonomous mode (the spoke is the source of truth) uses <code>mode: autonomous</
 </div>
 <div class="listingblock console-input">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc logs deployment/openshift-gitops-agent-agent -n openshift-gitops --context spoke-a --tail 20
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc logs deployment/gitops-spoke-a-agent-agent -n gitops-spoke-a --context spoke-a --tail 20
 oc logs deployment/openshift-gitops-agent-principal -n openshift-gitops --context hub --tail 10
 argocd-agentctl agent list \
   --principal-namespace openshift-gitops --principal-context hub</code></pre>
@@ -508,10 +555,10 @@ argocd-agentctl agent list \
 <div class="content">
 <pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc patch argocd openshift-gitops -n openshift-gitops --context spoke-b --type merge \
   -p '{"spec":{"argoCDAgent":{"agent":{"enabled":false}},"server":{"enabled":true}}}'
-oc patch argocd openshift-gitops -n openshift-gitops --context spoke-a --type merge \
-  -p '{"spec":{"argoCDAgent":{"agent":{"enabled":false}},"server":{"enabled":true}}}'
+oc patch argocd gitops-spoke-a -n gitops-spoke-a --context spoke-a --type merge \
+  -p '{"spec":{"argoCDAgent":{"agent":{"enabled":false}},"server":{"enabled":false}}}'
 oc delete secret argocd-agent-client-tls argocd-agent-ca -n openshift-gitops --context spoke-b --ignore-not-found
-oc delete secret argocd-agent-client-tls argocd-agent-ca -n openshift-gitops --context spoke-a --ignore-not-found
+oc delete secret argocd-agent-client-tls argocd-agent-ca -n gitops-spoke-a --context spoke-a --ignore-not-found
 oc delete secret cluster-spoke-b cluster-spoke-a -n openshift-gitops --context hub --ignore-not-found</code></pre>
 </div>
 </div>

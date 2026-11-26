@@ -80,9 +80,6 @@
     <a class="nav-link" href="#enable-principal">Enable the Principal</a>
   </li>
   <li class="nav-item" data-depth="2">
-    <a class="nav-link" href="#agent-namespaces">Agent Namespaces</a>
-  </li>
-  <li class="nav-item" data-depth="2">
     <a class="nav-link" href="#lab-pki">Lab Certificates and JWT Key</a>
   </li>
 </ul>
@@ -114,6 +111,54 @@
   </li>
 </ul>
   </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="04-fleet-tagging.html">Step 4: Fleet Tagging</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#tag-instance">Tag the Clusters</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#kustomize-set">Kustomize per Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#helm-set">Helm per Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="04-fleet-tagging.html#select-by-tag">Choose Clusters by Tag</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="05-staged-rollout.html">Step 5: Staged Rollout</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#enable">Turn on Progressive Syncs</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#create">Staged ApplicationSet</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="05-staged-rollout.html#gate">Break a Release</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <button class="nav-item-toggle"></button>
+    <a class="nav-link" href="06-teams-projects.html">Step 6: Teams and Projects</a>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#create-projects">Project per Environment</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#use-projects">Projects from the Tag</a>
+  </li>
+  <li class="nav-item" data-depth="2">
+    <a class="nav-link" href="06-teams-projects.html#boundaries">Try to Break the Boundaries</a>
+  </li>
+</ul>
+  </li>
 </ul>
   </li>
 </ul>
@@ -140,7 +185,7 @@
 <div id="preamble">
 <div class="sectionbody">
 <div class="paragraph">
-<p>This step turns the hub&#8217;s Argo CD into the Principal: the component that spokes connect to. It also creates one namespace per spoke and the certificates the Principal needs.</p>
+<p>This step turns the hub&#8217;s Argo CD into the Principal: the component that spokes connect to. It also creates the certificates the Principal needs.</p>
 </div>
 </div>
 </div>
@@ -180,7 +225,7 @@ The certificates in this step come from <code>argocd-agentctl pki</code>, which 
 <p>The hub <code>ArgoCD</code> gets <code>spec.argoCDAgent.principal</code>. The hub application controller is switched off, because each spoke runs its own controller.</p>
 </li>
 <li>
-<p>The Principal maps one agent to one hub namespace. <code>sourceNamespaces</code> must list every agent namespace exactly.</p>
+<p>The Principal uses <strong>destination-based mapping</strong>: an <code>Application</code> or <code>ApplicationSet</code> lives in the hub&#8217;s <code>openshift-gitops</code> namespace and picks its spoke with <code>spec.destination.name</code>. The default is one hub namespace per agent. This workshop does not use it, because the <code>ApplicationSet</code> controller ignores the namespace in its template and always creates the generated applications next to itself, where a namespace-mapped agent never sees them. This was found by testing on ROSA HCP.</p>
 </li>
 <li>
 <p>The Principal takes the agent name from the client certificate common name (<code>auth: "mtls:CN=([^,]+)"</code>).</p>
@@ -198,7 +243,7 @@ The certificates in this step come from <code>argocd-agentctl pki</code>, which 
 <p><span class="icon"><i class="fa fa-clock"></i></span> timing not measured yet</p>
 </div>
 <div class="paragraph">
-<p><strong>What:</strong> Merge the Principal settings into the hub&#8217;s <code>ArgoCD</code>, and list both agent namespaces in <code>sourceNamespaces</code>.</p>
+<p><strong>What:</strong> Merge the Principal settings into the hub&#8217;s <code>ArgoCD</code>.</p>
 </div>
 <div class="paragraph">
 <p><strong>Why:</strong> The Principal stays <code>0/1</code> and no spoke can connect until it is enabled and has its secrets.</p>
@@ -214,7 +259,7 @@ oc patch argocd openshift-gitops -n openshift-gitops --context hub \
 </div>
 </div>
 <div class="paragraph">
-<p><code>insecureGenerate: false</code> means you supply the certificates in section 3. Setting it to <code>true</code> makes the Principal generate throwaway ones that agents must not verify. Do not use that outside a lab.</p>
+<p><code>insecureGenerate: false</code> means you supply the certificates in section 2. <code>destinationBasedMapping: true</code> must be set on every agent as well (step 2). Setting it to <code>true</code> makes the Principal generate throwaway ones that agents must not verify. Do not use that outside a lab.</p>
 </div>
 <details>
 <summary class="title">Verify: Principal objects exist</summary>
@@ -227,7 +272,7 @@ oc patch argocd openshift-gitops -n openshift-gitops --context hub \
 <div class="listingblock console-output">
 <div class="content">
 <pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">NAME                                                    READY   STATUS    RESTARTS
-pod/openshift-gitops-agent-principal-...                0/1     Running   0
+pod/openshift-gitops-agent-principal-...                0/1     CrashLoopBackOff   1
 pod/openshift-gitops-redis-...                          1/1     Running   0
 pod/openshift-gitops-repo-server-...                    1/1     Running   0
 pod/openshift-gitops-server-...                         1/1     Running   0
@@ -239,7 +284,7 @@ route.route.openshift.io/openshift-gitops-agent-principal   ...</code></pre>
 </div>
 </div>
 <div class="paragraph">
-<p>The Principal pod is <code>0/1</code> until the secrets of section 3 exist. That is expected here.</p>
+<p>The Principal pod crash-loops (<code>CrashLoopBackOff</code>) until the secrets of section 2 exist. That is expected here. It recovers on its own once they exist (seen on ROSA HCP, GitOps 1.22.4).</p>
 </div>
 </div>
 </details>
@@ -268,43 +313,7 @@ To use a load balancer instead of the route, set <code>spec.argoCDAgent.principa
 <hr>
 </div>
 <div class="sect2">
-<h3 id="agent-namespaces"><a class="anchor" href="#agent-namespaces"></a>2. Create one namespace per agent on the hub</h3>
-<div class="paragraph">
-<p><strong>What:</strong> Namespaces <code>spoke-a</code> and <code>spoke-b</code> on the hub.</p>
-</div>
-<div class="paragraph">
-<p><strong>Why:</strong> In managed mode the hub sends an agent only the applications found in the namespace named after it. The name must match the agent name exactly.</p>
-</div>
-<div class="listingblock console-input">
-<div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc create namespace spoke-a --context hub
-oc create namespace spoke-b --context hub</code></pre>
-</div>
-</div>
-<details>
-<summary class="title">Verify: namespaces are active and listed as source namespaces</summary>
-<div class="content">
-<div class="listingblock console-input">
-<div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc get ns spoke-a spoke-b --context hub
-oc get argocd openshift-gitops -n openshift-gitops --context hub \
-  -o jsonpath='{.spec.sourceNamespaces}{"\n"}'</code></pre>
-</div>
-</div>
-<div class="listingblock console-output">
-<div class="content">
-<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">NAME      STATUS   AGE
-spoke-a   Active   5s
-spoke-b   Active   5s
-["spoke-a","spoke-b"]</code></pre>
-</div>
-</div>
-</div>
-</details>
-<hr>
-</div>
-<div class="sect2">
-<h3 id="lab-pki"><a class="anchor" href="#lab-pki"></a>3. Create the lab certificates and the JWT key</h3>
+<h3 id="lab-pki"><a class="anchor" href="#lab-pki"></a>2. Create the lab certificates and the JWT key</h3>
 <div class="paragraph">
 <p><span class="icon"><i class="fa fa-clock"></i></span> timing not measured yet</p>
 </div>
@@ -469,20 +478,19 @@ openshift-gitops-agent-principal-...   1/1   Running   0
 <h2 id="_reset"><a class="anchor" href="#_reset"></a>Reset</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>Disable the Principal and turn the controller back on first, then delete the namespaces and secrets.</p>
+<p>Disable the Principal and turn the controller back on first, then delete the secrets.</p>
 </div>
 <div class="listingblock console-input">
 <div class="content">
 <pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">oc patch argocd openshift-gitops -n openshift-gitops --context hub --type merge \
   -p '{"spec":{"controller":{"enabled":true},"argoCDAgent":{"principal":{"enabled":false}}}}'
-oc delete ns spoke-b spoke-a --context hub --ignore-not-found
 oc delete secret argocd-agent-jwt argocd-agent-resource-proxy-tls \
   argocd-agent-principal-tls argocd-agent-ca \
   -n openshift-gitops --context hub --ignore-not-found</code></pre>
 </div>
 </div>
 <div class="paragraph">
-<p>The order matters: the Principal reads the secrets, so it must be off before they disappear. <code>sourceNamespaces</code> stays set. Remove it from <code>hub-argocd.backup.yaml</code> if you want the original object back.</p>
+<p>The order matters: the Principal reads the secrets, so it must be off before they disappear. The patch also leaves <code>destinationBasedMapping</code> set. Restore <code>hub-argocd.backup.yaml</code> if you want the original object back.</p>
 </div>
 </div>
 </div>
