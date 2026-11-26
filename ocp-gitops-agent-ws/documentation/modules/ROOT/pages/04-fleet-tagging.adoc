@@ -1,0 +1,237 @@
+= Step 4 - Fleet Tagging: One Definition, Many Clusters
+include::_attributes.adoc[]
+
+This step replaces one hand-written `Application` per cluster with one `ApplicationSet` that creates an application for every cluster carrying a tag. The same source then renders differently per cluster: a Helm values file, or a Kustomize overlay, chosen by the tag. This is the part that plays the role of ACM placement and subscriptions for a small fleet.
+
+== Prerequisites
+
+* xref:03-first-application.adoc[Step 3] finished.
+* Both agents connected, with `env=test` on `spoke-a` and `env=prod` on `spoke-b` (step 2).
+* The sample repository `https://github.com/demon86rm/ocp-gitops-fleet-sample` has two flavours of the same page, `apps/hello/helm` (`values-test.yaml`, `values-prod.yaml`) and `apps/hello/kustomize` (`overlays/test`, `overlays/prod`). The page shows which environment rendered it.
+
+== How It Works
+
+. `agent create` made one Argo CD cluster secret per agent (`cluster-spoke-a`, `cluster-spoke-b`) and put your `--label` tags on it.
+. The `ApplicationSet` cluster generator reads those secrets, keeps the ones whose labels match the selector, and creates one `Application` for each. Inside the template, `{{.name}}` is the agent name and `.metadata.labels` holds the tags.
+. Because the Principal uses destination-based mapping, each generated `Application` stays in `openshift-gitops` and `destination.name` sends it to the right agent.
+
+== Steps to Apply
+
+[#tag-instance]
+=== 1. Record each spoke's Argo CD instance name as a tag
+
+*What:* Add a `gitops-instance` label to each cluster secret.
+
+*Why:* The label `argocd.argoproj.io/managed-by` on a target namespace must name the Argo CD instance on that spoke. In this workshop `spoke-a` runs `gitops-spoke-a` and `spoke-b` runs `openshift-gitops`, so the template reads the instance name from the tag instead of hard-coding it.
+
+[.console-input]
+[source,bash]
+----
+oc label secret cluster-spoke-a gitops-instance=gitops-spoke-a -n openshift-gitops --context hub --overwrite
+oc label secret cluster-spoke-b gitops-instance=openshift-gitops -n openshift-gitops --context hub --overwrite
+----
+
+.Verify: both secrets carry both tags
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc get secret cluster-spoke-a cluster-spoke-b -n openshift-gitops --context hub --show-labels
+----
+
+[.console-output]
+[source,bash]
+----
+cluster-spoke-a   ...   env=test,gitops-instance=gitops-spoke-a,...
+cluster-spoke-b   ...   env=prod,gitops-instance=openshift-gitops,...
+----
+====
+
+'''
+
+[#kustomize-set]
+=== 2. Deploy the Kustomize app to every tagged cluster
+
+icon:clock[] ~1 minute (applications generated in seconds, pods ready in ~30 seconds; measured once on ROSA HCP)
+
+*What:* Apply an `ApplicationSet` that selects clusters with an `env` label and picks the overlay named by that label.
+
+*Why:* Adding a third cluster later needs only `agent create --label env=...`. No new application file.
+
+[.console-input]
+[source,bash]
+----
+oc apply -f 04-fleet-tagging/applicationset-kustomize.yaml --context hub
+----
+
+.Verify: one application per cluster, and the page differs by environment
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc get application.argoproj.io -n openshift-gitops --context hub | grep fleet-kustomize
+oc get deploy -n fleet-kustomize --context spoke-a
+oc get deploy -n fleet-kustomize --context spoke-b
+----
+
+[.console-output]
+[source,bash]
+----
+fleet-kustomize-spoke-a   Synced   Healthy
+fleet-kustomize-spoke-b   Synced   Healthy
+
+NAME    READY   UP-TO-DATE   AVAILABLE
+hello   1/1     1            1
+
+NAME    READY   UP-TO-DATE   AVAILABLE
+hello   2/2     2            2
+----
+
+Open each cluster's route in a browser. `spoke-a` shows `environment: test`, `spoke-b` shows `environment: prod`.
+====
+
+NOTE: The overlays keep the same resource names on every cluster. A `namePrefix` looks tempting but Kustomize does not rewrite the Service name inside an OpenShift `Route`, so the route breaks and returns 503.
+
+'''
+
+[#helm-set]
+=== 3. Deploy the Helm chart the same way
+
+icon:clock[] ~1 minute
+
+*What:* Apply a second `ApplicationSet` for the Helm chart. The values file is `values-<env>.yaml`, chosen by the tag.
+
+*Why:* Helm and Kustomize work the same way here. Pick whichever your team already uses.
+
+[.console-input]
+[source,bash]
+----
+oc apply -f 04-fleet-tagging/applicationset-helm.yaml --context hub
+----
+
+.Verify: replicas follow the tag
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc get deploy -n fleet-helm --context spoke-a
+oc get deploy -n fleet-helm --context spoke-b
+----
+
+[.console-output]
+[source,bash]
+----
+NAME                  READY   UP-TO-DATE   AVAILABLE
+fleet-helm-spoke-a    1/1     1            1
+
+NAME                  READY   UP-TO-DATE   AVAILABLE
+fleet-helm-spoke-b    2/2     2            2
+----
+====
+
+'''
+
+[#select-by-tag]
+=== 4. Choose clusters by tag
+
+icon:clock[] ~10 seconds to remove, ~30 seconds to bring back (measured once)
+
+*What:* Narrow the selector of the Kustomize `ApplicationSet` to `env=test`, then put it back.
+
+*Why:* The tag is the placement rule. Changing the selector, or a cluster's label, moves workloads without touching any application.
+
+[.console-input]
+[source,bash]
+----
+oc patch applicationset fleet-kustomize -n openshift-gitops --context hub --type json \
+  -p '[{"op":"replace","path":"/spec/generators/0/clusters/selector","value":{"matchLabels":{"env":"test"}}}]'
+----
+
+.Verify: the spoke-b application and its workload are gone
+[%collapsible]
+====
+[.console-input]
+[source,bash]
+----
+oc get application.argoproj.io -n openshift-gitops --context hub | grep fleet-kustomize
+oc get deploy -n fleet-kustomize --context spoke-b
+----
+
+[.console-output]
+[source,bash]
+----
+fleet-kustomize-spoke-a   Synced   Healthy
+
+No resources found in fleet-kustomize namespace.
+----
+====
+
+Put the selector back:
+
+[.console-input]
+[source,bash]
+----
+oc patch applicationset fleet-kustomize -n openshift-gitops --context hub --type json \
+  -p '[{"op":"replace","path":"/spec/generators/0/clusters/selector","value":{"matchExpressions":[{"key":"env","operator":"Exists"}]}}]'
+----
+
+WARNING: Removing a cluster from the selector deletes its application and, with `prune: true` and the default finalizer, its workload. Check the selector before you apply it.
+
+'''
+
+== What This Solves (Compared to Step 3)
+
+[cols="2,3",options="header"]
+|===
+| Problem from Step 3 | How This Step Solves It
+| One `Application` per cluster, written by hand | One `ApplicationSet` creates them from the cluster tags
+| `test` and `prod` get the same settings | A Helm values file or a Kustomize overlay is chosen by the `env` tag
+| Moving a workload between clusters | Change a tag or the selector
+|===
+
+== What This Does NOT Solve (Yet)
+
+[cols="2,3",options="header"]
+|===
+| Remaining Problem | Addressed In
+| `test` and `prod` roll out at the same moment | Staged rollout (to be added)
+| Any team can deploy to any cluster | Teams and projects (to be added)
+| Secrets for the applications | Secrets and bootstrap (to be added)
+|===
+
+== Official Documentation
+
+* link:{gitops-docs}[Red Hat OpenShift GitOps {gitops-version}, Argo CD Agent installation]
+* link:https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/[Red Hat OpenShift GitOps documentation, ApplicationSet cluster generator]
+
+== Alternatives Considered
+
+[cols="2,4",options="header"]
+|===
+| Approach | Notes
+| `ApplicationSet` with the cluster generator (this step) | Placement by tag. Fits a small fleet and keeps everything in Git
+| A list generator | Clusters named in the file. Simple but you edit it for every new cluster
+| One `Application` per cluster | What step 3 did. Fine for one or two clusters
+|===
+
+'''
+
+== Reset
+
+Deleting an `ApplicationSet` deletes the applications it created, and `prune: true` then removes their workloads.
+
+[.console-input]
+[source,bash]
+----
+oc delete -f 04-fleet-tagging/applicationset-helm.yaml --context hub --ignore-not-found --wait
+oc delete -f 04-fleet-tagging/applicationset-kustomize.yaml --context hub --ignore-not-found --wait
+oc delete namespace fleet-helm fleet-kustomize --context spoke-a --ignore-not-found
+oc delete namespace fleet-helm fleet-kustomize --context spoke-b --ignore-not-found
+oc label secret cluster-spoke-b gitops-instance- -n openshift-gitops --context hub
+oc label secret cluster-spoke-a gitops-instance- -n openshift-gitops --context hub
+----
+
+The order matters: delete the `ApplicationSet`s first so nothing recreates the namespaces, then remove the labels last.

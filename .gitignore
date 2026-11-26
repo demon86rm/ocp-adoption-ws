@@ -16,3 +16,6 @@ gh-pages/
 package-lock.json
 yarn.lock
 yarn-error.log
+
+# Local backups made by the workshop commands
+*.backup.yaml

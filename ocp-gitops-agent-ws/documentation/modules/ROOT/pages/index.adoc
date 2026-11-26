@@ -8,7 +8,7 @@ include::_attributes.adoc[]
 
 Run application delivery for 3 to 6 clusters from one hub. A small team labels each cluster, writes one Helm chart or Kustomize base, and the Argo CD Agent delivers it to every matching cluster over an outbound connection. This workshop builds that setup step by step on one hub that doubles as a first spoke, plus one separate spoke.
 
-IMPORTANT: Draft. Commands have not been run on a cluster yet and no timings are measured. Each step page says what is validated.
+IMPORTANT: Draft. Steps 0 to 4 were run once on two ROSA HCP clusters (OpenShift 5.0.1, OpenShift GitOps 1.22.4, `argocd-agentctl` 0.11.0). Later steps are not written yet. Timings are single measurements.
 
 [.tiles.browse]
 == Browse Modules
@@ -31,6 +31,12 @@ IMPORTANT: Draft. Commands have not been run on a cluster yet and no timings are
 [.tile]
 .xref:03-first-application.adoc[Step 3: First Application]
 * xref:03-first-application.adoc#deploy[Deploy from the Hub]
+
+[.tile]
+.xref:04-fleet-tagging.adoc[Step 4: Fleet Tagging]
+* xref:04-fleet-tagging.adoc#kustomize-set[Kustomize per Tag]
+* xref:04-fleet-tagging.adoc#helm-set[Helm per Tag]
+* xref:04-fleet-tagging.adoc#select-by-tag[Choose Clusters by Tag]
 
 == How it fits together
 

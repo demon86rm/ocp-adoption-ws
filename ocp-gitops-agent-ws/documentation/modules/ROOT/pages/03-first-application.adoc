@@ -1,68 +1,77 @@
 = Step 3 - First Application: Deploy from the Hub to a Spoke
 include::_attributes.adoc[]
 
-This step creates one `Application` on the hub and watches it reach `spoke-a`. It proves the whole chain before the fleet steps add tags, Helm and Kustomize.
+This step creates one `Application` on the hub and watches it reach `spoke-a`. It proves the whole chain before the fleet step adds tags, Helm and Kustomize.
 
 == Prerequisites
 
 * xref:02-register-spokes.adoc[Step 2] finished: both agents show as connected.
-* The sample repository below is the Red Hat getting-started repository. It is public. Swap in your own repository when you have one.
+* The sample application lives in the public repository `https://github.com/demon86rm/ocp-gitops-fleet-sample`. Argo CD needs no credentials to read it. Fork it when you want to change it.
 
 == How It Works
 
-In managed mode the Principal sends every application found in a hub namespace to the agent with the same name. `destination.name` is the agent name. Anything changed by hand on the spoke is reverted by `selfHeal`.
+The `Application` lives in the hub's `openshift-gitops` namespace. `destination.name` is the agent name, and the Principal sends the application to that agent. The spoke's own controller renders and applies it, and `selfHeal` reverts changes made by hand.
+
+The label `argocd.argoproj.io/managed-by` on the target namespace says which Argo CD instance on the *spoke* may manage it. On a normal spoke that is `openshift-gitops`. `spoke-a` runs its own instance called `gitops-spoke-a`, so the manifest uses that name. With the wrong value the sync fails with `forbidden`.
 
 == Steps to Apply
 
 [#deploy]
 === 1. Create the Application on the hub
 
-icon:clock[] timing not measured yet
+icon:clock[] ~30 seconds from apply to `Synced` and `Healthy` (measured once on ROSA HCP)
 
-*What:* Apply `03-first-application/application-managed.yaml` in the hub namespace `spoke-a`.
+*What:* Apply `03-first-application/application-first.yaml` on the hub.
 
-*Why:* The namespace selects the agent. The `Application` object is the only thing you create. The workload appears on the spoke.
+*Why:* The `Application` object is the only thing you create. The workload appears on the spoke.
 
 [.console-input]
 [source,bash]
 ----
-oc apply -f 03-first-application/application-managed.yaml -n spoke-a --context hub
+oc apply -f 03-first-application/application-first.yaml --context hub
 ----
 
-.Verify: the hub application is Synced and Healthy, a copy and the workload exist on the spoke
+.Verify: the application is Synced and Healthy and the workload runs on the spoke
 [%collapsible]
 ====
 [.console-input]
 [source,bash]
 ----
-oc get application.argoproj.io my-demo-app -n spoke-a --context hub
-oc get application.argoproj.io my-demo-app -n gitops-spoke-a --context spoke-a
-oc get all -n my-app --context spoke-a
+oc get application.argoproj.io hello-first -n openshift-gitops --context hub
+oc get deploy,route -n first-app --context spoke-a
 ----
 
 [.console-output]
 [source,bash]
 ----
 NAME          SYNC STATUS   HEALTH STATUS
-my-demo-app   Synced        Healthy
+hello-first   Synced        Healthy
+
+NAME                    READY   UP-TO-DATE   AVAILABLE
+deployment.apps/hello   1/1     1            1
+
+NAME                             HOST/PORT
+route.route.openshift.io/hello   hello-first-app.apps.<cluster domain>
 ----
 
-The hub UI shows the application and its live resources through the resource proxy.
+Open the route in a browser. The page says `environment: test`. The hub UI shows the application and its live resources through the resource proxy.
 ====
 
 '''
 
 === 2. Check that self-heal reverts a manual change
 
-*What:* Delete a deployment on the spoke and watch it come back.
+icon:clock[] ~30 seconds
+
+*What:* Delete the deployment on the spoke and watch it come back.
 
 *Why:* This is the difference between managed mode and "someone installed it once". The hub copy is the source of truth.
 
 [.console-input]
 [source,bash]
 ----
-oc delete deployment --all -n my-app --context spoke-a
-oc get deployment -n my-app --context spoke-a --watch
+oc delete deployment hello -n first-app --context spoke-a
+oc get deployment -n first-app --context spoke-a --watch
 ----
 
 .Verify: the deployment is recreated
@@ -71,8 +80,8 @@ oc get deployment -n my-app --context spoke-a --watch
 [.console-output]
 [source,bash]
 ----
-NAME   READY   UP-TO-DATE   AVAILABLE
-...    1/1     1            1
+NAME    READY   UP-TO-DATE   AVAILABLE
+hello   1/1     1            1
 ----
 ====
 
@@ -92,8 +101,8 @@ NAME   READY   UP-TO-DATE   AVAILABLE
 [cols="2,3",options="header"]
 |===
 | Remaining Problem | Addressed In
-| One `Application` per cluster, written by hand | Fleet tagging step (to be added)
-| `test` and `prod` get the same rollout at the same time | Staged rollout step (to be added)
+| One `Application` per cluster, written by hand | xref:04-fleet-tagging.adoc[Step 4]
+| `test` and `prod` get the same settings | xref:04-fleet-tagging.adoc[Step 4]
 |===
 
 == Official Documentation
@@ -105,8 +114,8 @@ NAME   READY   UP-TO-DATE   AVAILABLE
 [cols="2,4",options="header"]
 |===
 | Approach | Notes
-| `Application` per agent namespace (this step) | Simplest. Namespace-based mapping
-| Destination-based mapping | Applications may live in any hub namespace and pick the agent by `destination.name`. Managed agents only. Needs a setting on both Principal and agent
+| Destination-based mapping (this workshop) | Applications live in `openshift-gitops` and pick the agent by name. Works with `ApplicationSet`. Managed agents only
+| Namespace-based mapping | One hub namespace per agent. The `ApplicationSet` controller ignores the template namespace, so generated applications never reach the spoke
 |===
 
 '''
@@ -118,8 +127,8 @@ Delete the application on the hub. `prune: true` removes the workload with it.
 [.console-input]
 [source,bash]
 ----
-oc delete application.argoproj.io my-demo-app -n spoke-a --context hub --ignore-not-found --wait
-oc delete namespace my-app --context spoke-a --ignore-not-found
+oc delete application.argoproj.io hello-first -n openshift-gitops --context hub --ignore-not-found --wait
+oc delete namespace first-app --context spoke-a --ignore-not-found
 ----
 
 The order matters: deleting the application first lets Argo CD prune the workload cleanly. The namespace delete only catches leftovers.

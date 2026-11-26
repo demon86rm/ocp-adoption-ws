@@ -5,16 +5,16 @@ This step registers `spoke-a` and `spoke-b` on the hub, gives each a client cert
 
 == Prerequisites
 
-* xref:01-hub-principal.adoc[Step 1] finished: the Principal pod is `1/1 Running`, the namespaces `spoke-a` and `spoke-b` exist on the hub.
+* xref:01-hub-principal.adoc[Step 1] finished: the Principal pod is `1/1 Running`.
 * `PRINCIPAL_DNS` is exported in this shell (see step 1, section 1).
 
-WARNING: The `--label` option below is documented on the Red Hat page as "optional metadata labels for the Agent". Whether it puts the label on the Argo CD cluster secret, and which value format it expects, is not validated. Step 4 depends on it. Run the check at the end of section 1 before you go on.
+NOTE: `--label env=test` puts the label `env=test` on the cluster secret `cluster-<agent>` (tested on ROSA HCP). Step 4 selects clusters with it.
 
 == How It Works
 
 . `argocd-agentctl agent create` registers the agent and creates the Argo CD cluster secret `cluster-<agent>` on the hub.
-. `argocd-agentctl pki propagate` copies the CA certificate to the spoke. `pki issue agent` creates the agent's client certificate with the agent name as common name.
-. The spoke's Argo CD gets `spec.argoCDAgent.agent`, in managed mode, pointing at the Principal route.
+. `argocd-agentctl pki issue agent` creates the agent's client certificate with the agent name as common name, and the CA secret on the spoke. `pki propagate` also copies the CA and is shown for the separate spoke.
+. The spoke's Argo CD gets `spec.argoCDAgent.agent`, in managed mode, with destination-based mapping on, pointing at the Principal route.
 
 == Steps to Apply
 
@@ -164,7 +164,7 @@ gitops-spoke-a-repo-server-...                  1/1   Running
 For `spoke-b` the prefix is `openshift-gitops`.
 ====
 
-NOTE: Autonomous mode (the spoke is the source of truth) uses `mode: autonomous` and needs a `default` `AppProject` in the spoke. This workshop uses managed mode on every spoke, so it is not covered here.
+NOTE: Autonomous mode (the spoke is the source of truth) uses `mode: autonomous`, a `default` `AppProject` in the spoke, and a hub namespace named after the agent. This workshop uses managed mode on every spoke, so it is not covered or tested here.
 
 '''
 

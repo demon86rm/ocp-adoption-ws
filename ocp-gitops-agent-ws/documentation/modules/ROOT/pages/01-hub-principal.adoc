@@ -1,7 +1,7 @@
 = Step 1 - Hub Principal: Turn the Hub Argo CD into the Control Plane
 include::_attributes.adoc[]
 
-This step turns the hub's Argo CD into the Principal: the component that spokes connect to. It also creates one namespace per spoke and the certificates the Principal needs.
+This step turns the hub's Argo CD into the Principal: the component that spokes connect to. It also creates the certificates the Principal needs.
 
 == Prerequisites
 
@@ -13,7 +13,7 @@ IMPORTANT: The certificates in this step come from `argocd-agentctl pki`, which 
 == How It Works
 
 . The hub `ArgoCD` gets `spec.argoCDAgent.principal`. The hub application controller is switched off, because each spoke runs its own controller.
-. The Principal maps one agent to one hub namespace. `sourceNamespaces` must list every agent namespace exactly.
+. The Principal uses *destination-based mapping*: an `Application` or `ApplicationSet` lives in the hub's `openshift-gitops` namespace and picks its spoke with `spec.destination.name`. The default is one hub namespace per agent. This workshop does not use it, because the `ApplicationSet` controller ignores the namespace in its template and always creates the generated applications next to itself, where a namespace-mapped agent never sees them. This was found by testing on ROSA HCP.
 . The Principal takes the agent name from the client certificate common name (`auth: "mtls:CN=([^,]+)"`).
 
 == Steps to Apply
@@ -23,7 +23,7 @@ IMPORTANT: The certificates in this step come from `argocd-agentctl pki`, which 
 
 icon:clock[] timing not measured yet
 
-*What:* Merge the Principal settings into the hub's `ArgoCD`, and list both agent namespaces in `sourceNamespaces`.
+*What:* Merge the Principal settings into the hub's `ArgoCD`.
 
 *Why:* The Principal stays `0/1` and no spoke can connect until it is enabled and has its secrets.
 
@@ -37,7 +37,7 @@ oc patch argocd openshift-gitops -n openshift-gitops --context hub \
   --type merge --patch-file 01-hub-principal/argocd-principal-patch.yaml
 ----
 
-`insecureGenerate: false` means you supply the certificates in section 3. Setting it to `true` makes the Principal generate throwaway ones that agents must not verify. Do not use that outside a lab.
+`insecureGenerate: false` means you supply the certificates in section 2. `destinationBasedMapping: true` must be set on every agent as well (step 2). Setting it to `true` makes the Principal generate throwaway ones that agents must not verify. Do not use that outside a lab.
 
 .Verify: Principal objects exist
 [%collapsible]
@@ -63,7 +63,7 @@ service/openshift-gitops-agent-principal-resource-proxy ...   9090/TCP
 route.route.openshift.io/openshift-gitops-agent-principal   ...
 ----
 
-The Principal pod crash-loops (`CrashLoopBackOff`) until the secrets of section 3 exist. That is expected here. It recovers on its own once they exist (seen on ROSA HCP, GitOps 1.22.4).
+The Principal pod crash-loops (`CrashLoopBackOff`) until the secrets of section 2 exist. That is expected here. It recovers on its own once they exist (seen on ROSA HCP, GitOps 1.22.4).
 ====
 
 Record the route host. Agents dial it and the certificate must name it.
@@ -80,45 +80,8 @@ NOTE: To use a load balancer instead of the route, set `spec.argoCDAgent.princip
 
 '''
 
-[#agent-namespaces]
-=== 2. Create one namespace per agent on the hub
-
-*What:* Namespaces `spoke-a` and `spoke-b` on the hub.
-
-*Why:* In managed mode the hub sends an agent only the applications found in the namespace named after it. The name must match the agent name exactly.
-
-[.console-input]
-[source,bash]
-----
-oc create namespace spoke-a --context hub
-oc create namespace spoke-b --context hub
-----
-
-.Verify: namespaces are active and listed as source namespaces
-[%collapsible]
-====
-[.console-input]
-[source,bash]
-----
-oc get ns spoke-a spoke-b --context hub
-oc get argocd openshift-gitops -n openshift-gitops --context hub \
-  -o jsonpath='{.spec.sourceNamespaces}{"\n"}'
-----
-
-[.console-output]
-[source,bash]
-----
-NAME      STATUS   AGE
-spoke-a   Active   5s
-spoke-b   Active   5s
-["spoke-a","spoke-b"]
-----
-====
-
-'''
-
 [#lab-pki]
-=== 3. Create the lab certificates and the JWT key
+=== 2. Create the lab certificates and the JWT key
 
 icon:clock[] timing not measured yet
 
@@ -213,17 +176,16 @@ If the pod stays `0/1`, restart it: `oc rollout restart deployment/openshift-git
 
 == Reset
 
-Disable the Principal and turn the controller back on first, then delete the namespaces and secrets.
+Disable the Principal and turn the controller back on first, then delete the secrets.
 
 [.console-input]
 [source,bash]
 ----
 oc patch argocd openshift-gitops -n openshift-gitops --context hub --type merge \
   -p '{"spec":{"controller":{"enabled":true},"argoCDAgent":{"principal":{"enabled":false}}}}'
-oc delete ns spoke-b spoke-a --context hub --ignore-not-found
 oc delete secret argocd-agent-jwt argocd-agent-resource-proxy-tls \
   argocd-agent-principal-tls argocd-agent-ca \
   -n openshift-gitops --context hub --ignore-not-found
 ----
 
-The order matters: the Principal reads the secrets, so it must be off before they disappear. `sourceNamespaces` stays set. Remove it from `hub-argocd.backup.yaml` if you want the original object back.
+The order matters: the Principal reads the secrets, so it must be off before they disappear. The patch also leaves `destinationBasedMapping` set. Restore `hub-argocd.backup.yaml` if you want the original object back.

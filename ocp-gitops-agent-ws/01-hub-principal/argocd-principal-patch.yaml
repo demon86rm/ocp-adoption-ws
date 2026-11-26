@@ -1,7 +1,8 @@
 # argocd-principal-patch.yaml
 # Purpose: merge patch that turns the hub Argo CD into the Argo CD Agent Principal.
 # Applied with: oc patch argocd openshift-gitops --type merge --patch-file <this file>
-# Note: a merge patch replaces list fields, so sourceNamespaces is overwritten, not appended.
+# destinationBasedMapping lets Applications (and ApplicationSets) live in openshift-gitops
+# and pick the agent with spec.destination.name.
 spec:
   controller:
     enabled: false
@@ -10,11 +11,9 @@ spec:
       enabled: true
       auth: "mtls:CN=([^,]+)"
       logLevel: "info"
+      destinationBasedMapping: true
       namespace:
         allowedNamespaces:
           - "*"
       tls:
         insecureGenerate: false
-  sourceNamespaces:
-    - "spoke-a"
-    - "spoke-b"

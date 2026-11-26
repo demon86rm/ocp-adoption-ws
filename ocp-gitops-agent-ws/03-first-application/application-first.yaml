@@ -1,0 +1,29 @@
+# application-first.yaml
+# Purpose: first Application. Created on the hub, delivered to spoke-a (destination-based mapping).
+# The managed-by label names the Argo CD instance on the SPOKE that may manage the namespace.
+# spoke-a runs its own instance called gitops-spoke-a. A normal spoke uses openshift-gitops.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hello-first
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: gitops-agent-workshop
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/demon86rm/ocp-gitops-fleet-sample
+    targetRevision: HEAD
+    path: apps/hello/kustomize/overlays/test
+  destination:
+    name: spoke-a
+    namespace: first-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    managedNamespaceMetadata:
+      labels:
+        argocd.argoproj.io/managed-by: gitops-spoke-a
+    syncOptions:
+      - CreateNamespace=true
